@@ -1,0 +1,24 @@
+Actúa como un desarrollador Senior de React especializado en Dashboards Financieros. Necesito implementar la lógica de obtención de datos históricos y el cálculo de rentabilidad para mi componente de "Evolución del Portfolio".
+
+REQUERIMIENTOS TÉCNICOS DE DATOS:
+1. El sistema debe recibir una lista de ISINs oficiales: IE000ZYRH0Q7, IE000QAZP7L2, IE00B42W3S00.
+2. Implementa una función asíncrona que, para cada ISIN, realice lo siguiente:
+   - Use la API de búsqueda de Yahoo Finance (https://query2.finance.yahoo.com/v1/finance/search?q={ISIN}) para obtener el 'symbol' (ticker) interno automáticamente.
+   - Con ese ticker, obtenga el histórico de precios de cierre (Close/Adj Close) diario desde la fecha de la primera inversión.
+   - Maneje el hecho de que los fondos de clase 'S' tienen históricos cortos (finales de 2023).
+
+LÓGICA DE LA GRÁFICA (RENTABILIDAD NETA):
+La gráfica NO debe mostrar el saldo total de la cuenta, sino la evolución del rendimiento porcentual acumulado.
+1. Ignorar depósitos: Si el usuario añade capital, la curva no debe saltar. La rentabilidad de ese día se basa en la variación del Valor Liquidativo (NAV).
+2. Cálculo: 
+   - Para cada día, calcula el rendimiento diario: (Precio_Hoy / Precio_Ayer) - 1.
+   - Calcula el rendimiento acumulado mediante el encadenamiento de esos rendimientos diarios (interés compuesto).
+   - Resultado final = (Producto de (1 + r_diario)) - 1.
+3. El punto de inicio (primera inversión) debe ser 0% o Base 100.
+
+CÓDIGO REQUERIDO:
+- Crea un Hook personalizado (usePortfolioHistory) que gestione estos estados.
+- Devuelve los datos formateados para mi librería de gráficas en React (formato: { date: 'YYYY-MM-DD', value: porcentaje_rentabilidad }).
+- Asegúrate de alinear las fechas de los 3 fondos, tratando los días festivos donde no hay cotización usando un 'forward fill' (mantener el último precio conocido).
+
+No te centres en la estética (CSS), solo en la lógica funcional de Fetching por ISIN y el cálculo matemático de la curva de rentabilidad neta.

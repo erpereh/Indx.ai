@@ -1,0 +1,96 @@
+'use client';
+
+import React from 'react';
+
+interface SidebarProps {
+    activeTab: 'dashboard' | 'investments' | 'fund-details';
+    onTabChange: (tab: 'dashboard' | 'investments' | 'fund-details') => void;
+}
+
+export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+    const navItems = [
+        { name: 'Resumen', id: 'dashboard', icon: 'House' },
+        { name: 'Inversiones', id: 'investments', icon: 'ChartLine' },
+        { name: 'Detalles de Fondos', id: 'fund-details', icon: 'ChartPie' },
+    ];
+
+    return (
+        <div className="flex-shrink-0 w-64 h-screen sticky top-0">
+            <div className="flex h-full flex-col justify-between bg-background border-r border-brand-border p-6">
+                <div className="flex flex-col gap-8">
+                    {/* Logo */}
+                    <div className="flex items-center gap-3 px-2">
+                        <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                        </div>
+                        <h1 className="text-xl font-bold text-text-primary tracking-tight">Indx.ai</h1>
+                    </div>
+
+                    {/* Navigation */}
+                    <nav className="flex flex-col gap-2">
+                        {navItems.map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => onTabChange(item.id as 'dashboard' | 'investments')}
+                                className={`
+                                    flex items-center gap-3 px-4 py-3 rounded-xl 
+                                    transition-all duration-200 ease-smooth w-full text-left
+                                    ${activeTab === item.id
+                                        ? 'bg-brand-primary/10 border-l-2 border-brand-primary text-brand-primary'
+                                        : 'text-text-tertiary hover:text-text-primary hover:bg-surface/50'
+                                    }
+                                `}
+                            >
+                                <div className={`transition-colors ${activeTab === item.id ? 'text-brand-primary' : ''}`}>
+                                    {renderIcon(item.icon)}
+                                </div>
+                                <span className={`text-sm font-medium ${activeTab === item.id ? 'font-semibold' : ''}`}>{item.name}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+
+                {/* Footer Info */}
+                <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
+                    <p className="text-xs text-text-tertiary mb-1">Estado del sistema</p>
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+                        <p className="text-xs font-medium text-text-secondary">Conectado</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function renderIcon(name: string) {
+    const iconClass = "w-5 h-5";
+
+    switch (name) {
+        case 'House':
+            return (
+                <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.69-8.69a2.25 2.25 0 00-3.18 0l-8.69 8.69a.75.75 0 001.06 1.06l8.69-8.69z" />
+                    <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" />
+                </svg>
+            );
+        case 'ChartLine':
+            return (
+                <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24">
+                    <path fillRule="evenodd" d="M2.25 13.5a8.25 8.25 0 018.25-8.25.75.75 0 01.75.75v6.75H18a.75.75 0 01.75.75 8.25 8.25 0 01-16.5 0z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M12.75 3a.75.75 0 01.75-.75 8.25 8.25 0 018.25 8.25.75.75 0 01-.75.75h-7.5a.75.75 0 01-.75-.75V3z" clipRule="evenodd" />
+                </svg>
+            );
+        case 'ChartPie':
+            return (
+                <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24">
+                    <path fillRule="evenodd" d="M1.371 8.143c5.858-5.857 15.356-5.857 21.214 0a15.004 15.004 0 011.087 1.29 1.487 1.487 0 00-2.31 1.765 11.967 11.967 0 00-1.637-1.408c-4.992-3.69-11.838-3.69-16.83 0-.094.069-.187.14-.279.213a1.487 1.487 0 00-2.245-2.074 14.977 14.977 0 011.002-1.004zM22.022 13.978a12.067 12.067 0 01-2.922 4.095c-4.992 3.69-11.838 3.69-16.83 0a12.067 12.067 0 01-2.922-4.095 1.503 1.503 0 00-2.72 1.054 15.074 15.074 0 003.738 5.174c5.858 5.857 15.356 5.857 21.214 0a15.074 15.074 0 003.738-5.174 1.503 1.503 0 00-2.72-1.054z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M12 11.25a.75.75 0 01.75.75v5.25a.75.75 0 01-1.5 0v-5.25a.75.75 0 01.75-.75z" clipRule="evenodd" />
+                </svg>
+            );
+        default:
+            return null;
+    }
+}

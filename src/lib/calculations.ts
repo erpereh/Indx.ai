@@ -1,0 +1,417 @@
+import { Investment, PortfolioSummary, HistoryEntry } from './types';
+
+/**
+ * Calculate the current value of an investment
+ */
+export function calculateCurrentValue(investment: Investment): number {
+    if (!investment.currentPrice) return 0;
+    return investment.shares * investment.currentPrice;
+}
+
+/**
+ * Calculate gain/loss for an investment
+ */
+export function calculateGainLoss(investment: Investment): {
+    amount: number;
+    percentage: number;
+} {
+    const currentValue = calculateCurrentValue(investment);
+    const amount = currentValue - investment.initialInvestment;
+    const percentage = investment.initialInvestment > 0
+        ? (amount / investment.initialInvestment) * 100
+        : 0;
+
+    const normalizeZero = (n: number) => (n === 0 ? 0 : n);
+
+    return {
+        amount: normalizeZero(Math.round(amount * 100) / 100),
+        percentage: normalizeZero(Math.round(percentage * 100) / 100),
+    };
+}
+
+/**
+ * Calculate portfolio summary from all investments
+ */
+export function calculatePortfolioSummary(
+    investments: Investment[],
+    history: HistoryEntry[] = []
+): PortfolioSummary {
+    const totalInvested = investments.reduce(
+        (sum, inv) => sum + inv.initialInvestment,
+        0
+    );
+
+    const totalValue = investments.reduce(
+        (sum, inv) => sum + calculateCurrentValue(inv),
+        0
+    );
+
+    const totalGainLoss = totalValue - totalInvested;
+    const totalGainLossPercent = totalInvested > 0
+        ? (totalGainLoss / totalInvested) * 100
+        : 0;
+
+    // Calculate daily changes using history
+    // Find yesterday's entry
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    // In a real app we'd look for exactly yesterday, but here we look for the last entry that isn't today
+    const previousEntries = history.filter(h => h.date !== today);
+    const lastEntry = previousEntries.length > 0 ? previousEntries[previousEntries.length - 1] : null;
+
+    let dayChange = 0;
+    let dayChangePercent = 0;
+
+    if (lastEntry) {
+        dayChange = totalValue - lastEntry.totalValue;
+        dayChangePercent = lastEntry.totalValue > 0
+            ? (dayChange / lastEntry.totalValue) * 100
+            : 0;
+    } else {
+        // Fallback: use today's individual stock changes if available
+        let weightedChangeSum = 0;
+        let totalCurrentVal = 0; // Only for stocks with change data
+
+        investments.forEach(inv => {
+            if (inv.dailyChangePercent !== undefined && inv.currentPrice) {
+                const val = calculateCurrentValue(inv);
+                const changeAmount = val - (val / (1 + inv.dailyChangePercent / 100));
+                weightedChangeSum += changeAmount;
+                totalCurrentVal += val;
+            }
+        });
+
+        dayChange = weightedChangeSum;
+        // Approximation for total portfolio change
+        dayChangePercent = totalValue > 0 ? (dayChange / totalValue) * 100 : 0;
+    }
+
+    const normalizeZero = (n: number) => (n === 0 ? 0 : n);
+
+    return {
+        totalValue: normalizeZero(Math.round(totalValue * 100) / 100),
+        totalInvested: normalizeZero(Math.round(totalInvested * 100) / 100),
+        totalGainLoss: normalizeZero(Math.round(totalGainLoss * 100) / 100),
+        totalGainLossPercent: normalizeZero(Math.round(totalGainLossPercent * 100) / 100),
+        dayChange: normalizeZero(Math.round(dayChange * 100) / 100),
+        dayChangePercent: normalizeZero(Math.round(dayChangePercent * 100) / 100),
+    };
+}
+
+/**
+ * Format currency value
+ */
+export function formatCurrency(value: number): string {
+    return new Intl.NumberFormat('es-ES', {
+        style: 'currency',
+        currency: 'EUR',
+    }).format(value);
+}
+
+/**
+ * Format percentage value
+ */
+export function formatPercentage(value: number): string {
+    const sign = value >= 0 ? '+' : '';
+    return `${sign}${value.toFixed(2)}%`;
+}
+
+/**
+ * Reconstructs the full portfolio history by aggregating individual investment histories.
+ * Handles interpolation for missing dates and respects purchase dates.
+ */
+export function reconstructPortfolioHistory(investments: Investment[]): HistoryEntry[] {
+    if (investments.length === 0) return [];
+
+    // 1. Determine the global start date (earliest purchase date)
+    const startDates = investments.map(inv => new Date(inv.purchaseDate).getTime());
+    const minDateTs = Math.min(...startDates);
+    const startDate = new Date(minDateTs);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // If start date is in the future (invalid), return empty or just today
+    if (startDate > today) return [];
+
+    const history: HistoryEntry[] = [];
+    const currentDate = new Date(startDate);
+
+    // Helper to find closest price for an investment at a given date
+    const getPriceAtDate = (inv: Investment, dateStr: string): number => {
+        if (!inv.historicalData || inv.historicalData.length === 0) {
+            // Fallback: use current price if no history available
+            // Ideally should try to find something reasonable, but current price is a safe fallback for "now"
+            // For past dates, this might distort, but we have no choice if data is missing.
+            return inv.currentPrice || 0;
+        }
+
+        // Find exact match
+        const exact = inv.historicalData.find(h => areDatesSame(h.date, dateStr));
+        if (exact) return exact.value;
+
+        // Find closest previous date (Interpolation/Hold previous)
+        // Assumes historicalData is somewhat sorted, but we can filter
+        const targetTs = new Date(dateStr).getTime();
+
+        // Filter for points before or on target date
+        const validPoints = inv.historicalData
+            .filter(h => new Date(h.date).getTime() <= targetTs)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Descending
+
+        if (validPoints.length > 0) return validPoints[0].value;
+
+        // If date is before all history, use the earliest history point? 
+        // Or assume purchase price? 
+        // For simplicity and preventing huge jumps, use the earliest available data point
+        // But strictly, we shouldn't have bought it yet if date < purchase, so this case is handled by ownership check
+        // However, if we bought it, but history only starts later, use earliest history.
+        return inv.historicalData[inv.historicalData.length - 1].value; // Assumes chronological or we re-sort?
+        // Let's safe sort historicalData once in context or here.
+    };
+
+    const normalizeZero = (n: number) => (n === 0 ? 0 : n);
+
+    // Iterate day by day from start to today
+    // Optimization: For very long spans, we might want to skip, but requirement says "Detect automatically... avoid saturation".
+    // We generate full daily history here, and UI component aggregates.
+
+    while (currentDate <= today) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        let totalValue = 0;
+        let totalInvested = 0;
+
+        investments.forEach(inv => {
+            // Check ownership
+            if (new Date(inv.purchaseDate) <= currentDate) {
+                const price = getPriceAtDate(inv, dateStr);
+                totalValue += inv.shares * price;
+                totalInvested += inv.initialInvestment; // Simplifying: invested amount is full amount once purchased
+            }
+        });
+
+        const totalGain = totalValue - totalInvested;
+
+        history.push({
+            date: dateStr,
+            totalValue: normalizeZero(Math.round(totalValue * 100) / 100),
+            totalInvested: normalizeZero(Math.round(totalInvested * 100) / 100),
+            totalGain: normalizeZero(Math.round(totalGain * 100) / 100)
+        });
+
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return history;
+}
+
+/**
+ * Calculate financial metrics for a fund based on its historical NAV.
+ */
+export function calculateFundMetrics(history: { date: string; value: number }[]) {
+    if (history.length < 2) return null;
+
+    const latest = history[history.length - 1];
+    const first = history[0];
+    const latestDate = new Date(latest.date);
+
+    // Helper to find value at a specific date or strictly before it
+    const getValueAtDate = (daysAgo: number | null, ytd: boolean = false) => {
+        let targetDate = new Date(latestDate);
+        
+        if (ytd) {
+            targetDate = new Date(targetDate.getFullYear(), 0, 1); // Jan 1st of current year
+        } else if (daysAgo !== null) {
+            targetDate.setDate(targetDate.getDate() - daysAgo);
+        }
+
+        const targetTs = targetDate.getTime();
+        
+        // Find the closest point ON or BEFORE the target date
+        // History is sorted ascending by default, so we reverse to find the latest point <= target
+        const point = [...history]
+            .reverse()
+            .find(h => new Date(h.date).getTime() <= targetTs);
+
+        return point ? point.value : null;
+    };
+
+    const calcReturn = (current: number, past: number | null) => {
+        if (past === null || past === 0) return 0;
+        return ((current - past) / past) * 100;
+    };
+
+    // Performance map
+    const performance: Record<string, number> = {};
+    const periods = [
+        { label: '1M', days: 30 },
+        { label: '3M', days: 90 },
+        { label: '6M', days: 180 },
+        { label: '1Y', days: 365 },
+    ];
+
+    periods.forEach(p => {
+        const pastVal = getValueAtDate(p.days);
+        // Only set if we actually found a past value (avoid 0% if data is missing)
+        if (pastVal !== null) {
+            performance[p.label] = calcReturn(latest.value, pastVal);
+        }
+    });
+
+    // YTD
+    const ytdVal = getValueAtDate(null, true);
+    if (ytdVal !== null) {
+        performance['YTD'] = calcReturn(latest.value, ytdVal);
+    }
+    
+    // Total
+    performance['Total'] = calcReturn(latest.value, first.value);
+
+    // Cumulative Return
+    const cumulativeReturn = performance['Total'];
+
+    // Annualized Return (CAGR)
+    const daysDiff = (new Date(latest.date).getTime() - new Date(first.date).getTime()) / (1000 * 60 * 60 * 24);
+    const yearsDiff = daysDiff / 365.25;
+    const annualizedReturn = yearsDiff > 0
+        ? (Math.pow(latest.value / first.value, 1 / yearsDiff) - 1) * 100
+        : cumulativeReturn;
+
+    // Annualized Volatility
+    const dailyReturns = [];
+    for (let i = 1; i < history.length; i++) {
+        const ret = Math.log(history[i].value / history[i - 1].value);
+        dailyReturns.push(ret);
+    }
+
+    const mean = dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length;
+    const variance = dailyReturns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (dailyReturns.length - 1);
+    const stdDev = Math.sqrt(variance);
+    const volatility = stdDev * Math.sqrt(252) * 100; // Annualized
+
+    // Max Drawdown
+    let maxDrawdown = 0;
+    let peak = history[0].value;
+    history.forEach(h => {
+        if (h.value > peak) peak = h.value;
+        const dd = (h.value - peak) / peak;
+        if (dd < maxDrawdown) maxDrawdown = dd;
+    });
+
+    return {
+        performance,
+        cumulativeReturn,
+        annualizedReturn,
+        volatility,
+        maxDrawdown: Math.abs(maxDrawdown * 100)
+    };
+}
+
+/**
+ * Filter and aggregate fund history based on preset ranges (DIA, MES, AÑO, ALL)
+ * to avoid chart saturation and provide clear trends.
+ */
+export function filterFundHistory(
+    history: { date: string; value: number }[],
+    range: 'DIA' | 'MES' | 'AÑO' | 'ALL'
+) {
+    if (!history || history.length === 0) return [];
+
+    // Ensure sorted chronological
+    const sorted = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const latestDate = new Date(sorted[sorted.length - 1].date);
+
+    switch (range) {
+        case 'DIA':
+            // Rule: Last 30 real data points
+            return sorted.slice(-30);
+
+        case 'MES': {
+            // Rule: From Jan 1st of current year to Now (YTD view)
+            const startOfYear = new Date(latestDate.getFullYear(), 0, 1);
+            return sorted.filter(h => new Date(h.date) >= startOfYear);
+        }
+
+        case 'AÑO': {
+            // Rule: Last 365 days, grouped by Month End
+            const oneYearAgo = new Date(latestDate);
+            oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+            
+            const lastYearData = sorted.filter(h => new Date(h.date) >= oneYearAgo);
+            
+            // Group by month
+            const monthly: { date: string; value: number }[] = [];
+            const months: Record<string, { date: string; value: number }[]> = {};
+
+            lastYearData.forEach(h => {
+                const d = new Date(h.date);
+                const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+                if (!months[key]) months[key] = [];
+                months[key].push(h);
+            });
+
+            Object.values(months).forEach(group => {
+                monthly.push(group[group.length - 1]);
+            });
+            
+            return monthly;
+        }
+
+        case 'ALL': {
+            // Rule: Full history, grouped by Month End
+            const monthly: { date: string; value: number }[] = [];
+            const months: Record<string, { date: string; value: number }[]> = {};
+
+            sorted.forEach(h => {
+                const d = new Date(h.date);
+                const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+                if (!months[key]) months[key] = [];
+                months[key].push(h);
+            });
+
+            Object.values(months).forEach(group => {
+                monthly.push(group[group.length - 1]);
+            });
+
+            return monthly;
+        }
+
+        default:
+            return sorted;
+    }
+}
+
+/**
+ * Aggregate history for chart views (legacy support)
+ */
+export function aggregateHistory(history: { date: string; value: number }[], interval: 'daily' | 'monthly' | 'annual') {
+    if (interval === 'daily') return history;
+
+    const aggregated: { date: string; value: number }[] = [];
+    const groups: Record<string, { date: string; value: number }[]> = {};
+
+    history.forEach(h => {
+        const date = new Date(h.date);
+        const key = interval === 'monthly'
+            ? `${date.getFullYear()}-${date.getMonth()}`
+            : `${date.getFullYear()}`;
+
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(h);
+    });
+
+    Object.values(groups).forEach(group => {
+        aggregated.push(group[group.length - 1]);
+    });
+
+    return aggregated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+// Helper for date comparison
+function areDatesSame(d1: string, d2: string) {
+    const date1 = new Date(d1);
+    const date2 = new Date(d2);
+    return date1.getFullYear() === date2.getFullYear() &&
+        date1.getMonth() === date2.getMonth() &&
+        date1.getDate() === date2.getDate();
+}

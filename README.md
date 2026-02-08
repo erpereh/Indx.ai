@@ -1,32 +1,132 @@
+# Indx.ai - Dashboard de Inversiones
 
-# Personal Investment Dashboard
+Dashboard completo de inversiones personales construido con Next.js, diseñado para seguir tu cartera de fondos con actualización automática de precios.
 
-## Setup
+## 🚀 Características
 
-1. **Install Dependencies**
-   If the automatic installation stalled, run:
-   ```bash
-   npm install clsx tailwind-merge lucide-react @tremor/react @headlessui/react @heroicons/react drizzle-orm @vercel/postgres cheerio date-fns @clerk/nextjs --legacy-peer-deps
-   npm install -D drizzle-kit dotenv --legacy-peer-deps
-   ```
+- **Dashboard Moderno**: Interfaz oscura con paleta azul y diseño fintech profesional
+- **Precios en Tiempo Real**: Obtención automática de precios desde Financial Times
+- **Visualización con Gráficos**: Charts interactivos con Chart.js
+  - Gráfico de línea: Evolución de cartera
+  - Gráfico de dona: Distribución por inversión
+- **Gestión de Inversiones**: Agregar y eliminar fondos dinámicamente
+- **Cálculos Automáticos**: Totales, ganancias/pérdidas, y rendimientos
+- **Responsive**: Totalmente adaptado para móvil y desktop
+- **Persistencia**: Datos guardados en localStorage
 
-2. **Environment Variables**
-   Copy `.env.example` to `.env.local` and fill in your Vercel Postgres and Clerk keys.
+## 📁 Estructura del Proyecto
 
-3. **Database Migration**
-   Push the schema to Vercel Postgres:
-   ```bash
-   npx drizzle-kit push
-   ```
-   (Ensure you are logged into Vercel or have the correct POSTGRES_URL).
+```
+Indx.ai/
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx         # Layout principal con Provider
+│   │   ├── page.tsx           # Dashboard principal
+│   │   └── globals.css        # Estilos globales
+│   ├── components/
+│   │   ├── Header.tsx         # Encabezado
+│   │   ├── PortfolioSummary.tsx    # Resumen de cartera
+│   │   ├── ChartsSection.tsx  # Gráficos
+│   │   ├── InvestmentsList.tsx     # Lista de inversiones
+│   │   └── AddInvestmentModal.tsx  # Modal para agregar
+│   ├── context/
+│   │   └── InvestmentContext.tsx   # Estado global
+│   └── lib/
+│       ├── types.ts           # Definiciones TypeScript
+│       ├── priceService.ts    # Servicio de precios
+│       ├── calculations.ts    # Cálculos financieros
+│       └── storage.ts         # LocalStorage
+├── package.json
+└── tailwind.config.ts
 
-4. **Run Development Server**
-   ```bash
-   npm run dev
-   ```
+```
 
-## Features implemented
-- **Dashboard**: `app/dashboard/page.tsx` (Tremor Charts)
-- **Admin**: `app/admin/page.tsx` (Holdings Management)
-- **Scraper**: `lib/scraper.ts` (FT Markets)
-- **Cron**: `app/api/cron/route.ts` (Daily Updates)
+## 🛠️ Tecnologías
+
+- **Framework**: Next.js 15 (App Router)
+- **Lenguaje**: TypeScript
+- **Estilos**: Tailwind CSS + CSS personalizado
+- **Gráficos**: Chart.js + react-chartjs-2
+- **Fuente**: Inter (Google Fonts)
+- **Estado**: React Context API
+
+## 📦 Instalación y Uso
+
+### Instalar dependencias
+```bash
+npm install
+```
+
+### Modo desarrollo
+```bash
+npm run dev
+```
+
+Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
+
+### Producción
+```bash
+npm run build
+npm start
+```
+
+## 💡 Uso del Dashboard
+
+1. **Agregar Inversión**: Click en "Agregar Inversión"
+   - Ingresa nombre del fondo
+   - ISIN (12 caracteres)
+   - Número de participaciones
+   - Importe invertido
+
+2. **Ver Resumen**: El dashboard muestra automáticamente:
+   - Valor total de cartera
+   - Total invertido
+   - Ganancia/Pérdida (€ y %)
+
+3. **Gráficos**: Visualiza evolución y distribución
+
+4. **Actualizar Precios**: Click en "Actualizar Precios" para refrescar
+
+5. **Eliminar**: Click en el icono de papelera para eliminar fondos
+
+## 🔧 Configuración
+
+### Precios en Producción
+
+Por defecto, la app usa precios simulados (`fetchMockPrice`). Para usar precios reales de Financial Times:
+
+1. Edita `src/context/InvestmentContext.tsx`
+2. Reemplaza `fetchMockPrice` por `fetchPriceByISIN`
+3. Considera usar un proxy backend para evitar CORS
+
+### Personalizar Tema
+
+Edita `tailwind.config.ts` para cambiar colores:
+```typescript
+colors: {
+  primary: { ... },  // Colores azules
+  background: { ... } // Fondos oscuros
+}
+```
+
+## 📱 Responsive
+
+- **Desktop**: Vista de tabla completa
+- **Mobile**: Vista de tarjetas optimizada
+- **Tablet**: Layout adaptativo
+
+## 🎨 Diseño
+
+- Modo oscuro por defecto
+- Paleta azul (`#4d94ff` y variantes)
+- Tarjetas con bordes redondeados y sombras
+- Animaciones suaves (fade-in, slide-up)
+- Colores semánticos (verde=ganancia, rojo=pérdida)
+
+## 📄 Licencia
+
+Este proyecto es de uso personal.
+
+---
+
+**Desarrollado con ❤️ usando Next.js y TypeScript**
