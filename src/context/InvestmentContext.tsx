@@ -51,7 +51,7 @@ export function InvestmentProvider({ children }: { children: React.ReactNode }) 
                 if (!historicalData || historicalData.length === 0) {
                     historicalData = await fetchFundHistory(inv.isin);
                 }
-                
+
                 return {
                     ...inv,
                     name: cleanDuplicateName(priceData.name || inv.name),
@@ -206,26 +206,46 @@ export function InvestmentProvider({ children }: { children: React.ReactNode }) 
     const editInvestment = useCallback(async (id: string, fields: Partial<Investment>) => {
         const investment = investments.find(inv => inv.id === id);
 
-        const updatedList = investments.map(inv =>
-            inv.id === id ? { ...inv, ...fields } : inv
-        );
-        setInvestments(updatedList);
-        saveInvestments(updatedList);
+        // Calculate updated list optimistically based on current state (investments)
+        // Note: For high concurrency, using a reducer or functional update is better, 
+        // but here we need the list for side effects (API calls).
+        // Since we are now using Promise.all in the consumer, React batching should help.
+        // However, to be safe against race conditions inside this closure, we should use functional update for setInvestments
+        // and re-derive the list for side-effects if possible, or accept that side-effects operate on the snapshot.
+
+        let updatedListSnapshot: Investment[] = [];
+
+        setInvestments(prevInvestments => {
+            const newList = prevInvestments.map(inv =>
+                inv.id === id ? { ...inv, ...fields } : inv
+            );
+            updatedListSnapshot = newList; // Capture for side effects
+            saveInvestments(newList);
+            return newList;
+        });
+
+        // Re-construct the list for side effects based on the closure 'investments' + 'fields'
+        // This is safe enough for saving to DB as we only care about the specific item ID
+        const updatedInvestment = { ...investment, ...fields } as Investment;
 
         // Persist to Supabase
-        if (user) {
-            const updatedInvestment = updatedList.find(inv => inv.id === id);
-            if (updatedInvestment) {
-                try {
-                    await upsertInvestment(user.id, updatedInvestment);
-                } catch (error) {
-                    console.error('Failed to update investment in Supabase:', error);
-                }
+        if (user && updatedInvestment) {
+            try {
+                await upsertInvestment(user.id, updatedInvestment);
+            } catch (error) {
+                console.error('Failed to update investment in Supabase:', error);
             }
         }
 
+        // Side effects that require the full list
+        // We reconstruct the list from the closure 'investments' to trigger these.
+        // In a perfect world, we'd wait for state update, but we can't easily here.
+        const derivedUpdatedList = investments.map(inv =>
+            inv.id === id ? { ...inv, ...fields } : inv
+        );
+
         if (fields.isin) {
-            // If ISIN changed, invalidate cache for old and new ISIN
+            // If ISIN changed, invalidate cache
             if (investment?.isin) {
                 invalidateCacheForISIN(investment.isin);
                 invalidateFullCacheForISIN(investment.isin);
@@ -235,16 +255,21 @@ export function InvestmentProvider({ children }: { children: React.ReactNode }) 
                 invalidateFullCacheForISIN(fields.isin);
             }
             // Full refresh needed
-            await refreshPricesInternal(updatedList);
+            await refreshPricesInternal(derivedUpdatedList);
         } else if (fields.shares !== undefined || fields.purchaseDate !== undefined) {
-            // If shares or purchaseDate changed, invalidate cache for this ISIN
+            // If shares or purchaseDate changed
             if (investment?.isin) {
                 invalidateCacheForISIN(investment.isin);
                 invalidateFullCacheForISIN(investment.isin);
             }
-            await refreshPricesInternal(updatedList);
+            await refreshPricesInternal(derivedUpdatedList);
         } else {
-            updateHistory(updatedList);
+            // Simple update (e.g. targetWeight), just update history
+            // We use the functional update to ensure history is based on latest state if possible
+            setInvestments(current => {
+                updateHistory(current);
+                return current;
+            });
         }
     }, [investments, user, updateHistory, refreshPricesInternal]);
 

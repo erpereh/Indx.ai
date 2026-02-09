@@ -1,143 +1,93 @@
-# Indx.ai - Dashboard de Inversiones 📊
+# Indx.ai - Dashboard de Inversiones Premium 📊
 
-> Dashboard completo de inversiones personales construido con Next.js, diseñado para seguir tu cartera de fondos indexados con actualización automática de precios y análisis en tiempo real.
+> **Tu Centro de Mando Financiero personal.**
+> Dashboard avanzado para la gestión de carteras de inversión pasiva, construido con Next.js y Supabase. Ofrece métricas profesionales como XIRR, benchmarking contra índices reales y herramientas de planificación financiera.
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Database-green)](https://supabase.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8)](https://tailwindcss.com/)
 
 ---
 
-## 🚀 Características
+## 🚀 Características Principales
 
-- **Dashboard Moderno**: Interfaz oscura con paleta azul y diseño fintech profesional
-- **Precios en Tiempo Real**: Integración con Yahoo Finance y Financial Times
-- **Visualización Avanzada**: Charts interactivos con Chart.js
-  - Gráfico de línea: Evolución de cartera
-  - Gráfico de dona: Distribución por inversión
-  - Gráfico de rentabilidad: % acumulado con encadenamiento diario
-- **Detalles de Fondos**: Análisis completo con holdings, sectores y distribución geográfica
-- **Gestión de Inversiones**: Agregar, editar y eliminar fondos dinámicamente
-- **Cálculos Automáticos**: Totales, ganancias/pérdidas y rendimientos
-- **Responsive**: Totalmente adaptado para móvil y desktop con menú hamburguesa
-- **Autenticación**: Sistema de login con Supabase
-- **Persistencia**: Datos guardados en localStorage y PostgreSQL
+### 📊 Análisis Financiero Profesional
+- **Rentabilidad Real (XIRR)**: Cálculo preciso de TU rentabilidad anualizada ponderada por el tiempo (TIR).
+- **Benchmarking**: Compara la evolución de tu cartera contra el **S&P 500** y el **MSCI World** en tiempo real.
+- **P&L Neto**: Visualización clara de Ganancias/Pérdidas en euros, separada del capital aportado.
 
-📚 **[Ver Documentación Técnica Completa](./DOCUMENTACION.md)**
+### ⚖️ Gestión Activa de Cartera
+- **Calculadora de Rebalanceo**: Define pesos objetivo (%) para tus activos y recibe sugerencias exactas de compra/venta para reequilibrar.
+- **Persistencia en Nube**: Tus objetivos de rebalanceo y cartera se sincronizan en la nube vía **Supabase**.
+- **Edición Múltiple**: Ajusta varios objetivos simultáneamente con validación en tiempo real.
 
-## 📁 Estructura del Proyecto
+### � Planificación a Futuro
+- **Simulador de Proyecciones**: Visualiza el poder del interés compuesto con sliders interactivos.
+- **Escenarios**: Configura aportación mensual, rentabilidad esperada y horizonte temporal.
 
-```
-Indx.ai/
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx         # Layout principal con Provider
-│   │   ├── page.tsx           # Dashboard principal
-│   │   └── globals.css        # Estilos globales
-│   ├── components/
-│   │   ├── Header.tsx         # Encabezado
-│   │   ├── PortfolioSummary.tsx    # Resumen de cartera
-│   │   ├── ChartsSection.tsx  # Gráficos
-│   │   ├── InvestmentsList.tsx     # Lista de inversiones
-│   │   └── AddInvestmentModal.tsx  # Modal para agregar
-│   ├── context/
-│   │   └── InvestmentContext.tsx   # Estado global
-│   └── lib/
-│       ├── types.ts           # Definiciones TypeScript
-│       ├── priceService.ts    # Servicio de precios
-│       ├── calculations.ts    # Cálculos financieros
-│       └── storage.ts         # LocalStorage
-├── package.json
-└── tailwind.config.ts
-
-```
-
-## 🛠️ Tecnologías
-
-- **Framework**: Next.js 15 (App Router)
-- **Lenguaje**: TypeScript
-- **Estilos**: Tailwind CSS + CSS personalizado
-- **Gráficos**: Chart.js + react-chartjs-2
-- **Fuente**: Inter (Google Fonts)
-- **Estado**: React Context API
-
-## 📦 Instalación y Uso
-
-### Instalar dependencias
-```bash
-npm install
-```
-
-### Modo desarrollo
-```bash
-npm run dev
-```
-
-Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
-
-### Producción
-```bash
-npm run build
-npm start
-```
-
-## 💡 Uso del Dashboard
-
-1. **Agregar Inversión**: Click en "Agregar Inversión"
-   - Ingresa nombre del fondo
-   - ISIN (12 caracteres)
-   - Número de participaciones
-   - Importe invertido
-
-2. **Ver Resumen**: El dashboard muestra automáticamente:
-   - Valor total de cartera
-   - Total invertido
-   - Ganancia/Pérdida (€ y %)
-
-3. **Gráficos**: Visualiza evolución y distribución
-
-4. **Actualizar Precios**: Click en "Actualizar Precios" para refrescar
-
-5. **Eliminar**: Click en el icono de papelera para eliminar fondos
-
-## 🔧 Configuración
-
-### Precios en Producción
-
-Por defecto, la app usa precios simulados (`fetchMockPrice`). Para usar precios reales de Financial Times:
-
-1. Edita `src/context/InvestmentContext.tsx`
-2. Reemplaza `fetchMockPrice` por `fetchPriceByISIN`
-3. Considera usar un proxy backend para evitar CORS
-
-### Personalizar Tema
-
-Edita `tailwind.config.ts` para cambiar colores:
-```typescript
-colors: {
-  primary: { ... },  // Colores azules
-  background: { ... } // Fondos oscuros
-}
-```
-
-## 📱 Responsive
-
-- **Desktop**: Vista de tabla completa
-- **Mobile**: Vista de tarjetas optimizada
-- **Tablet**: Layout adaptativo
-
-## 🎨 Diseño
-
-- Modo oscuro por defecto
-- Paleta azul (`#4d94ff` y variantes)
-- Tarjetas con bordes redondeados y sombras
-- Animaciones suaves (fade-in, slide-up)
-- Colores semánticos (verde=ganancia, rojo=pérdida)
-
-## 📄 Licencia
-
-Este proyecto es de uso personal.
+### 💻 Tecnología y DX
+- **Datos en Tiempo Real**: Integración con Yahoo Finance y Financial Times (Scraping).
+- **UI Premium**: Diseño Dark Mode profesional inspirado en apps fintech de alto nivel.
+- **Responsive**: Totalmente adaptado a móvil, tablet y escritorio.
 
 ---
 
-**Desarrollado con ❤️ usando Next.js y TypeScript**
+## 📚 Documentación Técnica
+
+Para una guía detallada sobre la arquitectura, API endpoints y estructura de base de datos, consulta la **[Documentación Técnica Completa](./DOCUMENTACION.md)**.
+
+---
+
+## 🛠️ Stack Tecnológico
+
+- **Frontend**: Next.js 15 (App Router), React 18, TypeScript.
+- **Estilos**: Tailwind CSS con sistema de diseño personalizado (variables CSS).
+- **Gráficos**: Chart.js 4 (Gráficas de área, línea y dona).
+- **Backend/DB**: Supabase (PostgreSQL + Auth) + Next.js API Routes.
+- **Datos**: Yahoo Finance API (Proxy propio) + Web Scraping.
+
+---
+
+## 📦 Instalación y Despliegue
+
+### Requisitos Previos
+- Node.js 18+
+- Cuenta en Supabase (para persistencia)
+
+### Paso 1: Clonar e Instalar
+```bash
+git clone https://github.com/erpereh/Indx.ai.git
+cd Indx.ai
+npm install
+```
+
+### Paso 2: Configurar Entorno
+Crea un archivo `.env.local`:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key
+```
+
+### Paso 3: Ejecutar en Desarrollo
+```bash
+npm run dev
+# Accede a http://localhost:3000
+```
+
+---
+
+## 🔧 Configuración de Base de Datos
+
+Para habilitar todas las funcionalidades (especialmente el rebalanceo persistente), ejecuta la siguiente migración en el SQL Editor de tu Supabase Dashboard:
+
+```sql
+ALTER TABLE investments ADD COLUMN IF NOT EXISTS target_weight NUMERIC DEFAULT NULL;
+```
+
+---
+
+## 📄 Licencia
+
+Este proyecto es para uso personal y educativo.
+Desarrollado con ❤️ y TypeScript.

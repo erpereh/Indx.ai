@@ -51,12 +51,12 @@ export default function RebalanceCalculator() {
     const saveWeights = async () => {
         setLoading(true);
         try {
-            for (const inv of investments) {
-                const newWeight = localWeights[inv.id];
-                if (newWeight !== inv.targetWeight) {
-                    await editInvestment(inv.id, { targetWeight: newWeight });
-                }
-            }
+            // Collect all promises to run in parallel
+            const updatePromises = investments
+                .filter(inv => localWeights[inv.id] !== inv.targetWeight)
+                .map(inv => editInvestment(inv.id, { targetWeight: localWeights[inv.id] }));
+
+            await Promise.all(updatePromises);
             setIsEditing(false);
         } catch (error) {
             console.error('Error saving target weights:', error);
@@ -160,7 +160,7 @@ export default function RebalanceCalculator() {
                                                     type="number"
                                                     value={localWeights[item.id]}
                                                     onChange={(e) => handleWeightChange(item.id, e.target.value)}
-                                                    className="w-16 bg-background border border-brand-border rounded-lg px-2 py-1 text-right text-sm text-primary-400 font-medium focus:outline-none focus:ring-1 focus:ring-primary-500/50 focus:border-primary-500/50"
+                                                    className="w-16 bg-background border border-brand-border rounded-lg px-2 py-1 text-right text-sm text-primary-400 font-medium focus:outline-none focus:ring-1 focus:ring-primary-500/50 focus:border-primary-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 />
                                                 <span className="ml-1 text-text-tertiary text-xs">%</span>
                                             </div>
