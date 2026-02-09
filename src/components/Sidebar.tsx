@@ -5,8 +5,8 @@ import { useAuth } from '@/context/AuthContext';
 import { LogOut } from 'lucide-react';
 
 interface SidebarProps {
-    activeTab: 'dashboard' | 'investments' | 'fund-details';
-    onTabChange: (tab: 'dashboard' | 'investments' | 'fund-details') => void;
+    activeTab: 'dashboard' | 'investments' | 'rebalance' | 'fund-details';
+    onTabChange: (tab: 'dashboard' | 'investments' | 'rebalance' | 'fund-details') => void;
     isMobileMenuOpen?: boolean;
     onMobileMenuClose?: () => void;
 }
@@ -14,7 +14,7 @@ interface SidebarProps {
 export default function Sidebar({ activeTab, onTabChange, isMobileMenuOpen = false, onMobileMenuClose }: SidebarProps) {
     const { user, signOut } = useAuth();
 
-    const handleTabChange = (tab: 'dashboard' | 'investments' | 'fund-details') => {
+    const handleTabChange = (tab: 'dashboard' | 'investments' | 'rebalance' | 'fund-details') => {
         onTabChange(tab);
         // Cerrar menú móvil al seleccionar una opción
         if (onMobileMenuClose) {
@@ -24,6 +24,7 @@ export default function Sidebar({ activeTab, onTabChange, isMobileMenuOpen = fal
     const navItems = [
         { name: 'Resumen', id: 'dashboard', icon: 'House' },
         { name: 'Inversiones', id: 'investments', icon: 'ChartLine' },
+        { name: 'Rebalanceo', id: 'rebalance', icon: 'ArrowsRightLeft' },
         { name: 'Detalles de Fondos', id: 'fund-details', icon: 'ChartPie' },
     ];
 
@@ -56,7 +57,7 @@ export default function Sidebar({ activeTab, onTabChange, isMobileMenuOpen = fal
                             {navItems.map((item) => (
                                 <button
                                     key={item.id}
-                                    onClick={() => handleTabChange(item.id as 'dashboard' | 'investments' | 'fund-details')}
+                                    onClick={() => handleTabChange(item.id as 'dashboard' | 'investments' | 'rebalance' | 'fund-details')}
                                     className={`
                                         flex items-center gap-3 px-4 py-3 rounded-xl 
                                         transition-all duration-200 ease-smooth w-full text-left
@@ -194,6 +195,12 @@ function renderIcon(name: string) {
                 <svg className={iconClass} fill="currentColor" viewBox="0 0 24 24">
                     <path fillRule="evenodd" d="M2.25 13.5a8.25 8.25 0 018.25-8.25.75.75 0 01.75.75v6.75H18a.75.75 0 01.75.75 8.25 8.25 0 01-16.5 0z" clipRule="evenodd" />
                     <path fillRule="evenodd" d="M12.75 3a.75.75 0 01.75-.75 8.25 8.25 0 018.25 8.25.75.75 0 01-.75.75h-7.5a.75.75 0 01-.75-.75V3z" clipRule="evenodd" />
+                </svg>
+            );
+        case 'ArrowsRightLeft':
+            return (
+                <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                 </svg>
             );
         case 'ChartPie':

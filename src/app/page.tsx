@@ -11,6 +11,8 @@ import InvestmentsList from '@/components/InvestmentsList';
 import GainsSection from '@/components/GainsSection';
 import AddInvestmentModal from '@/components/AddInvestmentModal';
 import FundDetailsSection from '@/components/FundDetailsSection';
+import RebalanceCalculator from '@/components/RebalanceCalculator';
+import ProjectionSimulator from '@/components/ProjectionSimulator';
 import AuthView from '@/components/AuthView';
 import { useInvestments } from '@/context/InvestmentContext';
 import { useAuth } from '@/context/AuthContext';
@@ -19,7 +21,7 @@ import { Investment } from '@/lib/types';
 export default function Home() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'investments' | 'fund-details'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'investments' | 'rebalance' | 'fund-details'>('dashboard');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { refreshPrices, loading } = useInvestments();
     const { user, loading: authLoading } = useAuth();
@@ -44,6 +46,11 @@ export default function Home() {
             return {
                 title: 'Cartera de Inversiones',
                 subtitle: 'Análisis detallado y gestión de fondos'
+            };
+        } else if (activeTab === 'rebalance') {
+            return {
+                title: 'Calculadora de Rebalanceo',
+                subtitle: 'Optimización de activos según tus objetivos'
             };
         } else {
             return {
@@ -123,6 +130,16 @@ export default function Home() {
                                         <InvestmentsList onEdit={handleEditInvestment} />
                                     </div>
                                 </section>
+
+                                {/* Future Projections Simulator */}
+                                <section className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
+                                    <div className="mb-4 flex items-center justify-between">
+                                        <h2 className="text-2xl font-bold text-text-primary">
+                                            Proyección a Futuro
+                                        </h2>
+                                    </div>
+                                    <ProjectionSimulator />
+                                </section>
                             </>
                         ) : activeTab === 'investments' ? (
                             <>
@@ -137,6 +154,10 @@ export default function Home() {
                                     </div>
                                 </section>
                             </>
+                        ) : activeTab === 'rebalance' ? (
+                            <section className="animate-fade-in">
+                                <RebalanceCalculator />
+                            </section>
                         ) : (
                             <section className="animate-fade-in">
                                 <FundDetailsSection />

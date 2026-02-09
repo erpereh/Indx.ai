@@ -29,8 +29,15 @@ ChartJS.register(
 );
 
 export default function HistorySection() {
-    const { investments, portfolioSummary } = useInvestments();
-    const { history: portfolioHistory, loading, error } = usePortfolioHistory(investments);
+    const { investments } = useInvestments();
+    const [benchmark, setBenchmark] = React.useState<string>(''); // Default: none
+    const { history: portfolioHistory, benchmarkHistory, loading, error } = usePortfolioHistory(investments, benchmark);
+
+    const benchmarks = useMemo(() => [
+        { name: 'Ninguno', symbol: '' },
+        { name: 'S&P 500', symbol: '^GSPC' },
+        { name: 'MSCI World', symbol: 'URTH' },
+    ], []);
 
     // Prepare data for Portfolio Evolution (Line Chart) with dynamic aggregation
     const evolutionData = useMemo(() => {
@@ -44,13 +51,16 @@ export default function HistorySection() {
         // Determine aggregation level
         const days = portfolioHistory.length;
         let dataPoints = portfolioHistory;
+        let benchDataPoints = benchmarkHistory;
 
         if (days > 365 * 2) {
             // > 2 years: Monthly
             dataPoints = portfolioHistory.filter((_, i) => i % 30 === 0 || i === portfolioHistory.length - 1);
+            benchDataPoints = benchmarkHistory.filter((_, i) => i % 30 === 0 || i === benchmarkHistory.length - 1);
         } else if (days > 90) {
             // > 3 months: Weekly
             dataPoints = portfolioHistory.filter((_, i) => i % 7 === 0 || i === portfolioHistory.length - 1);
+            benchDataPoints = benchmarkHistory.filter((_, i) => i % 7 === 0 || i === benchmarkHistory.length - 1);
         }
 
         const labels = dataPoints.map(h => {
@@ -64,45 +74,55 @@ export default function HistorySection() {
             }
         });
 
-        // P&L neto: totalValue - totalInvested para cada punto
-        const plData = dataPoints.map(h => h.totalValue - h.totalInvested);
-        const finalPL = plData[plData.length - 1] || 0;
-
-        return {
-            labels,
-            datasets: [
-                // Línea principal P&L con gradiente verde/rojo
-                {
-                    label: 'P&L Neto',
-                    data: plData,
-                    borderColor: finalPL >= 0 ? '#10b981' : '#ef4444',
-                    borderWidth: 2.5,
-                    fill: 'origin',
-                    backgroundColor: (context: any) => {
-                        const chart = context.chart;
-                        const { ctx, chartArea } = chart;
-                        if (!chartArea) return 'rgba(16, 185, 129, 0.1)';
-
-                        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-                        if (finalPL >= 0) {
-                            gradient.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
-                            gradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
-                        } else {
-                            gradient.addColorStop(0, 'rgba(239, 68, 68, 0)');
-                            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.25)');
-                        }
-                        return gradient;
-                    },
-                    tension: 0.4,
-                    pointRadius: 0,
-                    pointHoverRadius: 6,
-                    pointHoverBackgroundColor: finalPL >= 0 ? '#10b981' : '#ef4444',
-                    pointHoverBorderColor: '#fff',
-                    pointHoverBorderWidth: 2,
+        const datasets: any[] = [
+            // Línea principal: Ganancias/Pérdidas netas (€)
+            {
+                label: 'Ganancias/Pérdidas',
+                data: dataPoints.map(h => h.totalValue - h.totalInvested),
+                borderColor: '#6366f1',
+                borderWidth: 3,
+                fill: true,
+                backgroundColor: (context: any) => {
+                    const chart = context.chart;
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) return 'rgba(99, 102, 241, 0.1)';
+                    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.2)');
+                    gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+                    return gradient;
                 },
-            ],
-        };
-    }, [portfolioHistory]);
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: '#6366f1',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2,
+            }
+        ];
+
+        // Añadir benchmark si existe (normalizado al mismo capital inicial)
+        if (benchDataPoints.length > 0 && dataPoints.length > 0) {
+            const initialPL = dataPoints[0].totalValue - dataPoints[0].totalInvested;
+            datasets.push({
+                label: benchmarks.find(b => b.symbol === benchmark)?.name || 'Benchmark',
+                data: benchDataPoints.map((p, i) => {
+                    // Escalar el % del benchmark a la misma escala de € del P&L
+                    const plAtPoint = dataPoints[Math.min(i, dataPoints.length - 1)];
+                    const invested = plAtPoint?.totalInvested || 1;
+                    return invested * (p.returnPercent / 100);
+                }),
+                borderColor: '#94a3b8',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                fill: false,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+            });
+        }
+
+        return { labels, datasets };
+    }, [portfolioHistory, benchmarkHistory, benchmark, benchmarks]);
 
     const options = useMemo(() => {
         // Get dataPoints for tooltip access
@@ -124,7 +144,17 @@ export default function HistorySection() {
             },
             plugins: {
                 legend: {
-                    display: false,
+                    display: !!benchmark,
+                    position: 'top' as const,
+                    align: 'end' as const,
+                    labels: {
+                        color: '#94a3b8',
+                        usePointStyle: true,
+                        boxWidth: 8,
+                        font: {
+                            size: 11
+                        }
+                    }
                 },
                 datalabels: {
                     display: false,
@@ -139,7 +169,7 @@ export default function HistorySection() {
                     borderColor: '#334155',
                     borderWidth: 1,
                     padding: 12,
-                    displayColors: false,
+                    displayColors: true,
                     callbacks: {
                         title: (context: any) => {
                             const dataIndex = context[0].dataIndex;
@@ -152,19 +182,10 @@ export default function HistorySection() {
                             });
                         },
                         label: function (context: any) {
-                            if (context.datasetIndex !== 0) return undefined;
-                            
-                            const dataIndex = context.dataIndex;
-                            const point = dataPoints[dataIndex];
-                            if (!point) return undefined;
-                            
-                            const gain = point.totalValue - point.totalInvested;
-                            const gainPercent = point.returnPercent;
-                            
-                            return [
-                                `P&L: ${gain >= 0 ? '+' : ''}${formatCurrency(gain)}`,
-                                `Rentabilidad: ${gain >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%`
-                            ];
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y;
+                            const formatted = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value);
+                            return `${label}: ${value >= 0 ? '+' : ''}${formatted}`;
                         }
                     }
                 },
@@ -194,7 +215,10 @@ export default function HistorySection() {
                         },
                         maxTicksLimit: 6,
                         callback: function (value: any) {
-                            return formatCurrency(value);
+                            if (Math.abs(value) >= 1000) {
+                                return `${value >= 0 ? '+' : ''}${(value / 1000).toFixed(1)}k€`;
+                            }
+                            return `${value >= 0 ? '+' : ''}${value.toFixed(0)}€`;
                         }
                     },
                     border: {
@@ -225,9 +249,9 @@ export default function HistorySection() {
                 intersect: false
             },
         };
-    }, [portfolioHistory]);
+    }, [portfolioHistory, benchmark]);
 
-    const currentTotalValue = portfolioHistory.length > 0 
+    const currentTotalValue = portfolioHistory.length > 0
         ? portfolioHistory[portfolioHistory.length - 1]?.totalValue || 0
         : 0;
     const currentTotalInvested = portfolioHistory.length > 0
@@ -276,14 +300,32 @@ export default function HistorySection() {
 
     return (
         <div className="flex flex-col h-full w-full">
-            <div className="mb-6">
-                <p className="text-text-tertiary text-sm font-medium mb-2">Rentabilidad de mi Inversión</p>
-                <p className={`text-3xl font-bold ${gainColor} tracking-tight tabular-nums`}>
-                    {netGainLoss >= 0 ? '+' : ''}{formatCurrency(netGainLoss)}
-                </p>
-                <p className="text-text-tertiary text-xs mt-1">
-                    Ganancia/Pérdida neta
-                </p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
+                <div>
+                    <p className="text-text-tertiary text-sm font-medium mb-2">Ganancias / Pérdidas</p>
+                    <div className="flex items-baseline gap-3">
+                        <p className={`text-3xl font-bold ${gainColor} tracking-tight tabular-nums`}>
+                            {netGainLoss >= 0 ? '+' : ''}{formatCurrency(netGainLoss)}
+                        </p>
+                        <p className={`text-lg font-semibold ${gainColor} opacity-80`}>
+                            ({portfolioHistory.length > 0 ? (portfolioHistory[portfolioHistory.length - 1].returnPercent >= 0 ? '+' : '') : ''}{portfolioHistory.length > 0 ? portfolioHistory[portfolioHistory.length - 1].returnPercent.toFixed(2) : '0.00'}%)
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <span className="text-text-tertiary text-[11px]">Comparar:</span>
+                    <select
+                        value={benchmark}
+                        onChange={(e) => setBenchmark(e.target.value)}
+                        className="bg-surface border border-brand-border text-text-secondary text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer appearance-none"
+                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', backgroundSize: '16px', paddingRight: '24px' }}
+                    >
+                        {benchmarks.map((b) => (
+                            <option key={b.name} value={b.symbol}>{b.name}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             <div className="flex-1 w-full min-h-[220px]">

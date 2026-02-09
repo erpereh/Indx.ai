@@ -357,3 +357,44 @@ a {
     display: none !important;
   }
 }
+
+/* Premium Slider Styles */
+.slider-premium::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  border: 2px solid #818cf8;
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.slider-premium::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+}
+
+.slider-premium::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  border: 2px solid #818cf8;
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.4);
+}
+
+.slider-premium::-moz-range-track {
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Select dropdown styling for dark theme */
+select option {
+  background-color: #151e32;
+  color: #cbd5e1;
+}

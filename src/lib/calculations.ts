@@ -89,6 +89,9 @@ export function calculatePortfolioSummary(
 
     const normalizeZero = (n: number) => (n === 0 ? 0 : n);
 
+    // Calculate XIRR
+    const xirr = calculatePortfolioXIRR(investments);
+
     return {
         totalValue: normalizeZero(Math.round(totalValue * 100) / 100),
         totalInvested: normalizeZero(Math.round(totalInvested * 100) / 100),
@@ -96,6 +99,7 @@ export function calculatePortfolioSummary(
         totalGainLossPercent: normalizeZero(Math.round(totalGainLossPercent * 100) / 100),
         dayChange: normalizeZero(Math.round(dayChange * 100) / 100),
         dayChangePercent: normalizeZero(Math.round(dayChangePercent * 100) / 100),
+        xirr: xirr !== undefined ? normalizeZero(Math.round(xirr * 100) / 100) : undefined,
     };
 }
 
@@ -218,7 +222,7 @@ export function calculateFundMetrics(history: { date: string; value: number }[])
     // Helper to find value at a specific date or strictly before it
     const getValueAtDate = (daysAgo: number | null, ytd: boolean = false) => {
         let targetDate = new Date(latestDate);
-        
+
         if (ytd) {
             targetDate = new Date(targetDate.getFullYear(), 0, 1); // Jan 1st of current year
         } else if (daysAgo !== null) {
@@ -226,7 +230,7 @@ export function calculateFundMetrics(history: { date: string; value: number }[])
         }
 
         const targetTs = targetDate.getTime();
-        
+
         // Find the closest point ON or BEFORE the target date
         // History is sorted ascending by default, so we reverse to find the latest point <= target
         const point = [...history]
@@ -263,7 +267,7 @@ export function calculateFundMetrics(history: { date: string; value: number }[])
     if (ytdVal !== null) {
         performance['YTD'] = calcReturn(latest.value, ytdVal);
     }
-    
+
     // Total
     performance['Total'] = calcReturn(latest.value, first.value);
 
@@ -336,9 +340,9 @@ export function filterFundHistory(
             // Rule: Last 365 days, grouped by Month End
             const oneYearAgo = new Date(latestDate);
             oneYearAgo.setDate(oneYearAgo.getDate() - 365);
-            
+
             const lastYearData = sorted.filter(h => new Date(h.date) >= oneYearAgo);
-            
+
             // Group by month
             const monthly: { date: string; value: number }[] = [];
             const months: Record<string, { date: string; value: number }[]> = {};
@@ -353,7 +357,7 @@ export function filterFundHistory(
             Object.values(months).forEach(group => {
                 monthly.push(group[group.length - 1]);
             });
-            
+
             return monthly;
         }
 
@@ -427,13 +431,13 @@ function areDatesSame(d1: string, d2: string) {
  */
 function calculateDailyLogReturns(history: { date: string; value: number }[]): number[] {
     if (history.length < 2) return [];
-    
+
     const returns: number[] = [];
     for (let i = 1; i < history.length; i++) {
         const ret = Math.log(history[i].value / history[i - 1].value);
         returns.push(ret);
     }
-    
+
     return returns;
 }
 
@@ -450,7 +454,7 @@ function calculateMean(values: number[]): number {
  */
 function calculateStdDev(values: number[]): number {
     if (values.length < 2) return 0;
-    
+
     const mean = calculateMean(values);
     const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (values.length - 1);
     return Math.sqrt(variance);
@@ -461,15 +465,15 @@ function calculateStdDev(values: number[]): number {
  */
 function calculateCovariance(x: number[], y: number[]): number {
     if (x.length !== y.length || x.length < 2) return 0;
-    
+
     const meanX = calculateMean(x);
     const meanY = calculateMean(y);
-    
+
     let sum = 0;
     for (let i = 0; i < x.length; i++) {
         sum += (x[i] - meanX) * (y[i] - meanY);
     }
-    
+
     return sum / (x.length - 1);
 }
 
@@ -489,43 +493,43 @@ export function calculateBeta(
         // Not enough data for reliable calculation
         return undefined;
     }
-    
+
     // Align dates (only use dates that exist in both datasets)
     const fundMap = new Map(fundHistory.map(h => [h.date, h.value]));
     const benchmarkMap = new Map(benchmarkHistory.map(h => [h.date, h.value]));
-    
+
     const commonDates = fundHistory
         .map(h => h.date)
         .filter(date => benchmarkMap.has(date))
         .sort();
-    
+
     if (commonDates.length < 30) {
         return undefined; // Not enough overlapping data
     }
-    
+
     // Calculate returns for common dates
     const fundReturns: number[] = [];
     const benchmarkReturns: number[] = [];
-    
+
     for (let i = 1; i < commonDates.length; i++) {
         const prevDate = commonDates[i - 1];
         const currDate = commonDates[i];
-        
+
         const fundPrev = fundMap.get(prevDate)!;
         const fundCurr = fundMap.get(currDate)!;
         const benchPrev = benchmarkMap.get(prevDate)!;
         const benchCurr = benchmarkMap.get(currDate)!;
-        
+
         fundReturns.push(Math.log(fundCurr / fundPrev));
         benchmarkReturns.push(Math.log(benchCurr / benchPrev));
     }
-    
+
     // Beta = Cov(fund, benchmark) / Var(benchmark)
     const covariance = calculateCovariance(fundReturns, benchmarkReturns);
     const benchmarkVariance = Math.pow(calculateStdDev(benchmarkReturns), 2);
-    
+
     if (benchmarkVariance === 0) return undefined;
-    
+
     return covariance / benchmarkVariance;
 }
 
@@ -546,29 +550,29 @@ export function calculateAlpha(
     if (fundHistory.length < 2 || benchmarkHistory.length < 2) {
         return undefined;
     }
-    
+
     // Calculate Beta first
     const beta = calculateBeta(fundHistory, benchmarkHistory);
     if (beta === undefined) return undefined;
-    
+
     // Calculate annualized returns
     const fundFirst = fundHistory[0].value;
     const fundLast = fundHistory[fundHistory.length - 1].value;
-    const fundDays = (new Date(fundHistory[fundHistory.length - 1].date).getTime() - 
-                     new Date(fundHistory[0].date).getTime()) / (1000 * 60 * 60 * 24);
+    const fundDays = (new Date(fundHistory[fundHistory.length - 1].date).getTime() -
+        new Date(fundHistory[0].date).getTime()) / (1000 * 60 * 60 * 24);
     const fundYears = fundDays / 365.25;
     const fundReturn = fundYears > 0 ? (Math.pow(fundLast / fundFirst, 1 / fundYears) - 1) : 0;
-    
+
     const benchFirst = benchmarkHistory[0].value;
     const benchLast = benchmarkHistory[benchmarkHistory.length - 1].value;
-    const benchDays = (new Date(benchmarkHistory[benchmarkHistory.length - 1].date).getTime() - 
-                      new Date(benchmarkHistory[0].date).getTime()) / (1000 * 60 * 60 * 24);
+    const benchDays = (new Date(benchmarkHistory[benchmarkHistory.length - 1].date).getTime() -
+        new Date(benchmarkHistory[0].date).getTime()) / (1000 * 60 * 60 * 24);
     const benchYears = benchDays / 365.25;
     const benchReturn = benchYears > 0 ? (Math.pow(benchLast / benchFirst, 1 / benchYears) - 1) : 0;
-    
+
     // Alpha = R_fund - (R_f + β × (R_bench - R_f))
     const alpha = fundReturn - (riskFreeRate + beta * (benchReturn - riskFreeRate));
-    
+
     return alpha * 100; // Return as percentage
 }
 
@@ -585,22 +589,22 @@ export function calculateSharpeRatio(
     riskFreeRate: number = 0.03 // 3% default
 ): number | undefined {
     if (history.length < 2) return undefined;
-    
+
     // Calculate annualized return
     const first = history[0].value;
     const last = history[history.length - 1].value;
-    const days = (new Date(history[history.length - 1].date).getTime() - 
-                 new Date(history[0].date).getTime()) / (1000 * 60 * 60 * 24);
+    const days = (new Date(history[history.length - 1].date).getTime() -
+        new Date(history[0].date).getTime()) / (1000 * 60 * 60 * 24);
     const years = days / 365.25;
     const annualizedReturn = years > 0 ? (Math.pow(last / first, 1 / years) - 1) : 0;
-    
+
     // Calculate annualized volatility
     const dailyReturns = calculateDailyLogReturns(history);
     const dailyStdDev = calculateStdDev(dailyReturns);
     const annualizedVolatility = dailyStdDev * Math.sqrt(252); // 252 trading days
-    
+
     if (annualizedVolatility === 0) return undefined;
-    
+
     // Sharpe = (Return - RiskFreeRate) / Volatility
     return (annualizedReturn - riskFreeRate) / annualizedVolatility;
 }
@@ -629,26 +633,120 @@ export function calculateAdvancedRiskMetrics(
         sharpe3y?: number;
         calculated: boolean;
     } = { calculated: true };
-    
+
     // Calculate Sharpe (always possible with just fund history)
     const sharpe = calculateSharpeRatio(fundHistory, riskFreeRate);
     if (sharpe !== undefined) {
         metrics.sharpe3y = sharpe;
     }
-    
+
     // Calculate Beta and Alpha if benchmark provided
     if (benchmarkHistory && benchmarkHistory.length > 30) {
         const beta = calculateBeta(fundHistory, benchmarkHistory);
         if (beta !== undefined) {
             metrics.beta3y = beta;
         }
-        
+
         const alpha = calculateAlpha(fundHistory, benchmarkHistory, riskFreeRate);
         if (alpha !== undefined) {
             metrics.alpha3y = alpha;
         }
     }
-    
+
     return metrics;
 }
 
+
+// ============================================================================
+// XIRR CALCULATION (Extended Internal Rate of Return)
+// ============================================================================
+
+interface CashFlow {
+    date: Date;
+    amount: number;
+}
+
+/**
+ * Calculates XIRR using Newton-Raphson method.
+ * Equation: sum(cf_i / (1 + r)^((d_i - d_0) / 365)) = 0
+ * 
+ * @param flows - Array of cash flows {date, amount}
+ * @param guess - Initial guess for the rate (default 0.1 / 10%)
+ */
+export function calculateXIRR(flows: CashFlow[], guess: number = 0.1): number | undefined {
+    if (flows.length < 2) return undefined;
+
+    // Sort flows by date
+    const sortedFlows = [...flows].sort((a, b) => a.date.getTime() - b.date.getTime());
+    const d0 = sortedFlows[0].date;
+
+    // Function to calculate Net Present Value
+    const npv = (rate: number) => {
+        return sortedFlows.reduce((sum, flow) => {
+            const days = (flow.date.getTime() - d0.getTime()) / (1000 * 60 * 60 * 24);
+            return sum + flow.amount / Math.pow(1 + rate, days / 365);
+        }, 0);
+    };
+
+    // Derivative of NPV for Newton-Raphson
+    const dNpv = (rate: number) => {
+        return sortedFlows.reduce((sum, flow) => {
+            const days = (flow.date.getTime() - d0.getTime()) / (1000 * 60 * 60 * 24);
+            if (days === 0) return sum;
+            return sum - (days / 365) * flow.amount * Math.pow(1 + rate, -(days / 365) - 1);
+        }, 0);
+    };
+
+    let rate = guess;
+    const maxIterations = 100;
+    const precision = 0.000001;
+
+    for (let i = 0; i < maxIterations; i++) {
+        const value = npv(rate);
+        const derivative = dNpv(rate);
+
+        if (Math.abs(derivative) < precision) break;
+
+        const nextRate = rate - value / derivative;
+        if (Math.abs(nextRate - rate) < precision) return nextRate * 100; // Return as percentage
+
+        rate = nextRate;
+
+        // Safety break for extreme values
+        if (Math.abs(rate) > 100) break;
+    }
+
+    // If Newton-Raphson fails, try a simple bisection as fallback or return 0
+    return rate * 100;
+}
+
+/**
+ * Helper to calculate XIRR for the entire portfolio
+ */
+export function calculatePortfolioXIRR(investments: Investment[]): number | undefined {
+    if (investments.length === 0) return undefined;
+
+    const flows: CashFlow[] = [];
+    let totalCurrentValue = 0;
+
+    investments.forEach(inv => {
+        // 1. Initial Investment (Negative Flow)
+        flows.push({
+            date: new Date(inv.purchaseDate),
+            amount: -inv.initialInvestment
+        });
+
+        // 2. Accumulate current value for the final positive flow
+        totalCurrentValue += calculateCurrentValue(inv);
+    });
+
+    // 3. Final Flow (Positive, today's value)
+    if (totalCurrentValue > 0) {
+        flows.push({
+            date: new Date(),
+            amount: totalCurrentValue
+        });
+    }
+
+    return calculateXIRR(flows);
+}

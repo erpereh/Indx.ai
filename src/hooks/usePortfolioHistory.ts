@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Investment } from '@/lib/types';
-import { 
-    getYahooHistoryCache, 
-    saveYahooHistoryCache, 
-    cleanExpiredCache 
+import {
+    getYahooHistoryCache,
+    saveYahooHistoryCache,
+    cleanExpiredCache
 } from '@/lib/yahooCache';
 
 /**
@@ -16,25 +16,25 @@ export interface PortfolioHistoryPoint {
     totalValue: number;     // Valor del portfolio en esta fecha (€)
 }
 
+export interface BenchmarkPoint {
+    date: string;
+    returnPercent: number;
+}
+
 /**
  * Hook que calcula la evolución de rentabilidad porcentual del portfolio
- * utilizando datos de Yahoo Finance.
- *
- * Lógica:
- * 1. Obtiene símbolos Yahoo para cada ISIN
- * 2. Descarga históricos de precios diarios
- * 3. Aplica forward fill para días sin cotización
- * 4. Calcula rentabilidad diaria encadenada (interés compuesto)
- * 5. Retorna array de { date, returnPercent }
+ * y opcionalmente la de un benchmark (ej. S&P 500)
  */
-export function usePortfolioHistory(investments: Investment[]) {
+export function usePortfolioHistory(investments: Investment[], benchmarkSymbol?: string) {
     const [history, setHistory] = useState<PortfolioHistoryPoint[]>([]);
+    const [benchmarkHistory, setBenchmarkHistory] = useState<BenchmarkPoint[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!investments || investments.length === 0) {
             setHistory([]);
+            setBenchmarkHistory([]);
             return;
         }
 
@@ -46,7 +46,7 @@ export function usePortfolioHistory(investments: Investment[]) {
                 // 0. Limpiar caché expirado al inicio
                 cleanExpiredCache();
 
-                // 1. Obtener el ISIN más antiguo para determinar el rango de fechas
+                // 1. Obtener el rango de fechas
                 const earliestDate = investments.reduce((earliest, inv) => {
                     const invDate = new Date(inv.purchaseDate);
                     return invDate < earliest ? invDate : earliest;
@@ -54,53 +54,36 @@ export function usePortfolioHistory(investments: Investment[]) {
 
                 const latestDate = new Date();
 
-                console.log(
-                    `[usePortfolioHistory] Fetching history from ${earliestDate.toISOString().split('T')[0]} to ${latestDate.toISOString().split('T')[0]}`
-                );
-
-                // 2. Intentar obtener datos del caché primero, luego fetch si es necesario
+                // 2. Obtener datos de las inversiones y opcionalmente del benchmark
                 const dataPromises = investments.map(async (inv) => {
-                    // Intentar caché primero
                     const cached = getYahooHistoryCache(inv.isin);
-                    
-                    if (cached) {
-                        // Cache HIT - usar datos cacheados
-                        return {
-                            isin: inv.isin,
-                            symbol: cached.symbol,
-                            history: cached.history,
-                            fromCache: true,
-                        };
-                    }
+                    if (cached) return { isin: inv.isin, symbol: cached.symbol, history: cached.history, fromCache: true };
 
-                    // Cache MISS - fetch desde Yahoo Finance
                     try {
                         const symbol = await fetchYahooSymbol(inv.isin);
                         const history = await fetchYahooHistory(symbol, earliestDate, latestDate);
-                        
-                        // Guardar en caché para futuros usos
                         saveYahooHistoryCache(inv.isin, symbol, history);
-                        
-                        return {
-                            isin: inv.isin,
-                            symbol,
-                            history,
-                            fromCache: false,
-                        };
+                        return { isin: inv.isin, symbol, history, fromCache: false };
                     } catch (err) {
                         console.error(`Failed to fetch data for ${inv.isin}:`, err);
-                        return {
-                            isin: inv.isin,
-                            symbol: null,
-                            history: [],
-                            fromCache: false,
-                        };
+                        return { isin: inv.isin, symbol: null, history: [], fromCache: false };
                     }
                 });
 
-                const results = await Promise.all(dataPromises);
+                // Fetch benchmark if requested
+                const benchmarkPromise = benchmarkSymbol
+                    ? fetchYahooHistory(benchmarkSymbol, earliestDate, latestDate).catch(err => {
+                        console.error(`Failed to fetch benchmark ${benchmarkSymbol}:`, err);
+                        return [];
+                    })
+                    : Promise.resolve([]);
 
-                // 3. Filtrar inversiones con datos válidos y construir estructuras
+                const [results, benchmarkRaw] = await Promise.all([
+                    Promise.all(dataPromises),
+                    benchmarkPromise
+                ]);
+
+                // 3. Procesar resultados inversiones
                 const investmentsWithSymbols: (Investment & { yahooSymbol: string })[] = [];
                 const historiesMap = new Map<string, { date: string; value: number }[]>();
 
@@ -118,7 +101,7 @@ export function usePortfolioHistory(investments: Investment[]) {
                     throw new Error('Could not resolve any ISIN to Yahoo data');
                 }
 
-                // 4. Calcular rentabilidad diaria encadenada
+                // 4. Calcular rentabilidad diaria encadenada del portfolio
                 const portfolioHistory = calculateChainedReturns(
                     investmentsWithSymbols,
                     historiesMap,
@@ -127,13 +110,22 @@ export function usePortfolioHistory(investments: Investment[]) {
                 );
 
                 setHistory(portfolioHistory);
-                
+
+                // 5. Procesar benchmark
+                if (benchmarkRaw && benchmarkRaw.length > 0) {
+                    // Calcular rentabilidad acumulada del benchmark (%)
+                    const firstVal = benchmarkRaw[0].value;
+                    const benchPoints: BenchmarkPoint[] = benchmarkRaw.map(p => ({
+                        date: p.date,
+                        returnPercent: firstVal > 0 ? ((p.value / firstVal) - 1) * 100 : 0
+                    }));
+                    setBenchmarkHistory(benchPoints);
+                } else {
+                    setBenchmarkHistory([]);
+                }
+
                 const cacheHits = results.filter(r => r.fromCache).length;
-                const cacheMisses = results.filter(r => !r.fromCache).length;
-                
-                console.log(
-                    `[usePortfolioHistory] ✅ Success - ${portfolioHistory.length} points | Cache: ${cacheHits} hits, ${cacheMisses} misses`
-                );
+                console.log(`[usePortfolioHistory] Success - ${portfolioHistory.length} points | ${benchmarkRaw.length > 0 ? 'Benchmark OK' : 'No Benchmark'}`);
 
             } catch (err) {
                 const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -145,9 +137,9 @@ export function usePortfolioHistory(investments: Investment[]) {
         };
 
         performFetch();
-    }, [investments]);
+    }, [investments, benchmarkSymbol]);
 
-    return { history, loading, error };
+    return { history, benchmarkHistory, loading, error };
 }
 
 /**
@@ -245,7 +237,7 @@ function calculateChainedReturns(
         history.forEach(h => priceMap.set(h.date, h.value));
         priceMaps.set(isin, priceMap);
         // Ordenar cronológicamente para forward-fill
-        sortedHistories.set(isin, [...history].sort((a, b) => 
+        sortedHistories.set(isin, [...history].sort((a, b) =>
             new Date(a.date).getTime() - new Date(b.date).getTime()
         ));
     }

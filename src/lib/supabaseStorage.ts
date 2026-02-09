@@ -4,8 +4,8 @@ import type { Investment } from '@/lib/types';
 // ============================================
 // Supabase <-> TypeScript field mapping
 // ============================================
-// DB: id, user_id, isin, name, shares, total_investment, purchase_date, created_at, updated_at
-// TS: id, name, isin, shares, initialInvestment, purchaseDate, + runtime fields (currentPrice, etc.)
+// DB: id, user_id, isin, name, shares, total_investment, purchase_date, target_weight, created_at, updated_at
+// TS: id, name, isin, shares, initialInvestment, purchaseDate, targetWeight + runtime fields (currentPrice, etc.)
 
 interface SupabaseInvestmentRow {
     id: string;
@@ -15,6 +15,7 @@ interface SupabaseInvestmentRow {
     shares: number;
     total_investment: number;
     purchase_date: string;
+    target_weight: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -31,6 +32,7 @@ function rowToInvestment(row: SupabaseInvestmentRow): Investment {
         shares: Number(row.shares),
         initialInvestment: Number(row.total_investment),
         purchaseDate: row.purchase_date,
+        targetWeight: row.target_weight != null ? Number(row.target_weight) : undefined,
     };
 }
 
@@ -46,6 +48,7 @@ function investmentToRow(userId: string, inv: Investment): Omit<SupabaseInvestme
         shares: inv.shares,
         total_investment: inv.initialInvestment,
         purchase_date: inv.purchaseDate,
+        target_weight: inv.targetWeight ?? null,
     };
 }
 

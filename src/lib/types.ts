@@ -11,6 +11,7 @@ export interface Investment {
     priceError?: boolean;
     lastUpdated?: Date;
     historicalData?: { date: string; value: number }[];
+    targetWeight?: number; // Target weight in percentage (0-100)
 }
 
 export interface HistoryEntry {
@@ -27,6 +28,7 @@ export interface PortfolioSummary {
     totalGainLossPercent: number;
     dayChange?: number; // Total value change today in currency
     dayChangePercent?: number; // Total value change today in %
+    xirr?: number; // Annualized internal rate of return (%)
 }
 
 export interface ChartDataPoint {
