@@ -7,7 +7,7 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useInvestments } from '@/context/InvestmentContext';
 import { calculateCurrentValue, formatCurrency, formatPercentage } from '@/lib/calculations';
 
-ChartJS.register(ArcElement, Tooltip, Legend, ChartDataLabels);
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 export default function PortfolioDistributionChart() {
     const { investments, portfolioSummary } = useInvestments();
@@ -143,7 +143,7 @@ export default function PortfolioDistributionChart() {
             </div>
 
             <div className="h-[300px] w-full relative">
-                <Doughnut data={chartData} options={options} />
+                <Doughnut data={chartData} options={options} plugins={[ChartDataLabels]} />
             </div>
 
             {/* Summary Statistics */}

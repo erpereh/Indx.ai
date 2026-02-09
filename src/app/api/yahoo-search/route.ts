@@ -50,14 +50,31 @@ export async function GET(request: NextRequest) {
 
         // 3. Buscar específicamente un fondo (type === 'mutualfund' o 'equity')
         // Los fondos europeos a menudo aparecen como equity en Yahoo
+        // Preferir exchanges con mejor disponibilidad de datos históricos
         let targetQuote = null;
+        const preferredExchanges = ['.L', '.SW', '.AS', '.MI', '.PA']; // London, Swiss, Amsterdam, Milan, Paris
+        const lessPreferredExchanges = ['.F', '.BE', '.VI']; // Frankfurt, Berlin, Vienna
+        
+        // Función para calcular prioridad del símbolo
+        const getSymbolPriority = (symbol: string): number => {
+            for (let i = 0; i < preferredExchanges.length; i++) {
+                if (symbol.endsWith(preferredExchanges[i])) return 100 - i;
+            }
+            for (let i = 0; i < lessPreferredExchanges.length; i++) {
+                if (symbol.endsWith(lessPreferredExchanges[i])) return 50 - i;
+            }
+            return 0; // Otros exchanges
+        };
+
+        let bestPriority = -1;
 
         for (const quote of data.quotes) {
             // Preferir fondos, pero aceptar equity si contiene "fund" en el nombre
-            if (quote.quoteType === 'MUTUALFUND' || quote.quoteType === 'EQUITY') {
-                if (quote.symbol && !targetQuote) {
+            if ((quote.quoteType === 'MUTUALFUND' || quote.quoteType === 'EQUITY') && quote.symbol) {
+                const priority = getSymbolPriority(quote.symbol);
+                if (priority > bestPriority) {
+                    bestPriority = priority;
                     targetQuote = quote;
-                    break;
                 }
             }
         }

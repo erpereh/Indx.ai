@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const symbol = searchParams.get('symbol');
     const fromStr = searchParams.get('from');
     const toStr = searchParams.get('to');
+    const maxHistory = searchParams.get('maxHistory'); // 'true' = 10 years, default = 5 years
 
     if (!symbol) {
         return NextResponse.json(
@@ -22,11 +23,12 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // 1. Parsear fechas (defaults: from = 5 años atrás, to = hoy)
+        // 1. Parsear fechas (defaults: from = 5 or 10 años atrás, to = hoy)
         const toDate = toStr ? new Date(toStr) : new Date();
+        const defaultYears = maxHistory === 'true' ? 10 : 5;
         const fromDate = fromStr
             ? new Date(fromStr)
-            : new Date(toDate.getTime() - 5 * 365.25 * 24 * 60 * 60 * 1000);
+            : new Date(toDate.getTime() - defaultYears * 365.25 * 24 * 60 * 60 * 1000);
 
         console.log(`[YAHOO_HISTORY] Fetching ${symbol} from ${fromDate.toISOString().split('T')[0]} to ${toDate.toISOString().split('T')[0]}`);
 

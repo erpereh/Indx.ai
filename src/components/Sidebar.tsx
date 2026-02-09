@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { LogOut } from 'lucide-react';
 
 interface SidebarProps {
     activeTab: 'dashboard' | 'investments' | 'fund-details';
@@ -8,6 +10,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+    const { user, signOut } = useAuth();
     const navItems = [
         { name: 'Resumen', id: 'dashboard', icon: 'House' },
         { name: 'Inversiones', id: 'investments', icon: 'ChartLine' },
@@ -52,13 +55,30 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                     </nav>
                 </div>
 
-                {/* Footer Info */}
-                <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
-                    <p className="text-xs text-text-tertiary mb-1">Estado del sistema</p>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
-                        <p className="text-xs font-medium text-text-secondary">Conectado</p>
+                {/* Footer - User Info & Logout */}
+                <div className="flex flex-col gap-3">
+                    <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
+                        <p className="text-xs text-text-tertiary mb-1">Estado del sistema</p>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+                            <p className="text-xs font-medium text-text-secondary">Conectado</p>
+                        </div>
                     </div>
+
+                    {user && (
+                        <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
+                            <p className="text-xs text-text-tertiary truncate mb-2" title={user.email}>
+                                {user.email}
+                            </p>
+                            <button
+                                onClick={signOut}
+                                className="flex items-center gap-2 w-full text-xs text-text-tertiary hover:text-red-400 transition-colors duration-200"
+                            >
+                                <LogOut className="w-3.5 h-3.5" />
+                                <span>Cerrar Sesión</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

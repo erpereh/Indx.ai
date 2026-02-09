@@ -1,62 +1,59 @@
--- Enable UUID extension
-create extension if not exists "uuid-ossp";
+-- ============================================
+-- Indx.ai - Supabase Schema (Clean Start)
+-- ============================================
+-- Run this in Supabase SQL Editor after dropping all existing tables.
 
--- TABLE: funds (Metadata)
-create table if not exists funds (
-    isin text primary key,
-    name text,
-    currency text,
-    asset_type jsonb,
-    sectors jsonb,
-    regions jsonb,
-    updated_at timestamp with time zone default now()
+-- Step 1: Drop existing tables (clean slate)
+DROP TABLE IF EXISTS fund_nav_history CASCADE;
+DROP TABLE IF EXISTS investments CASCADE;
+DROP TABLE IF EXISTS funds CASCADE;
+
+-- Step 2: Create investments table
+CREATE TABLE investments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    isin TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    shares NUMERIC NOT NULL DEFAULT 0,
+    total_investment NUMERIC NOT NULL DEFAULT 0,
+    purchase_date DATE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- TABLE: fund_nav_history (Historical Prices)
-create table if not exists fund_nav_history (
-    id uuid primary key default uuid_generate_v4(),
-    isin text references funds(isin) on delete cascade,
-    nav_date date not null,
-    price numeric not null,
-    constraint unique_nav_entry unique(isin, nav_date)
-);
+-- Step 3: Enable Row Level Security
+ALTER TABLE investments ENABLE ROW LEVEL SECURITY;
 
--- Create index for faster history lookups
-create index if not exists idx_fund_nav_history_isin_date on fund_nav_history(isin, nav_date);
+-- Step 4: RLS Policies - each user can only access their own investments
+CREATE POLICY "Users can view their own investments"
+    ON investments FOR SELECT
+    USING (auth.uid() = user_id);
 
--- TABLE: investments (User Portfolios)
-create table if not exists investments (
-    id uuid primary key default uuid_generate_v4(),
-    user_id uuid references auth.users not null,
-    isin text references funds(isin), -- Optional FK enforcement, usually good
-    shares numeric not null default 0,
-    total_investment numeric not null default 0,
-    purchase_date date not null,
-    created_at timestamp with time zone default now()
-);
+CREATE POLICY "Users can insert their own investments"
+    ON investments FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
 
--- RLS: Security Policies
-alter table investments enable row level security;
+CREATE POLICY "Users can update their own investments"
+    ON investments FOR UPDATE
+    USING (auth.uid() = user_id);
 
-create policy "Users can view their own investments"
-on investments for select
-using (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own investments"
+    ON investments FOR DELETE
+    USING (auth.uid() = user_id);
 
-create policy "Users can insert their own investments"
-on investments for insert
-with check (auth.uid() = user_id);
+-- Step 5: Performance index
+CREATE INDEX idx_investments_user_id ON investments(user_id);
 
-create policy "Users can update their own investments"
-on investments for update
-using (auth.uid() = user_id);
+-- Step 6: Auto-update updated_at on row modification
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-create policy "Users can delete their own investments"
-on investments for delete
-using (auth.uid() = user_id);
-
--- Public read access for funds data (metadata and history)
-alter table funds enable row level security;
-create policy "Public funds access" on funds for select using (true);
-
-alter table fund_nav_history enable row level security;
-create policy "Public history access" on fund_nav_history for select using (true);
+CREATE TRIGGER investments_updated_at
+    BEFORE UPDATE ON investments
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

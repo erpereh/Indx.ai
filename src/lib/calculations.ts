@@ -415,3 +415,240 @@ function areDatesSame(d1: string, d2: string) {
         date1.getMonth() === date2.getMonth() &&
         date1.getDate() === date2.getDate();
 }
+
+// ============================================================================
+// ADVANCED RISK METRICS (Alpha, Beta, Sharpe Ratio)
+// Used when Yahoo Finance API doesn't provide these metrics
+// ============================================================================
+
+/**
+ * Calculate daily logarithmic returns from price history
+ * Log returns are additive and better for statistical analysis
+ */
+function calculateDailyLogReturns(history: { date: string; value: number }[]): number[] {
+    if (history.length < 2) return [];
+    
+    const returns: number[] = [];
+    for (let i = 1; i < history.length; i++) {
+        const ret = Math.log(history[i].value / history[i - 1].value);
+        returns.push(ret);
+    }
+    
+    return returns;
+}
+
+/**
+ * Calculate mean (average) of an array of numbers
+ */
+function calculateMean(values: number[]): number {
+    if (values.length === 0) return 0;
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+}
+
+/**
+ * Calculate standard deviation of an array of numbers
+ */
+function calculateStdDev(values: number[]): number {
+    if (values.length < 2) return 0;
+    
+    const mean = calculateMean(values);
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (values.length - 1);
+    return Math.sqrt(variance);
+}
+
+/**
+ * Calculate covariance between two arrays
+ */
+function calculateCovariance(x: number[], y: number[]): number {
+    if (x.length !== y.length || x.length < 2) return 0;
+    
+    const meanX = calculateMean(x);
+    const meanY = calculateMean(y);
+    
+    let sum = 0;
+    for (let i = 0; i < x.length; i++) {
+        sum += (x[i] - meanX) * (y[i] - meanY);
+    }
+    
+    return sum / (x.length - 1);
+}
+
+/**
+ * Calculate Beta (sensitivity to market/benchmark)
+ * Beta = Covariance(Fund, Benchmark) / Variance(Benchmark)
+ * 
+ * @param fundHistory - Fund price history
+ * @param benchmarkHistory - Benchmark price history (e.g., SPY)
+ * @returns Beta value (1.0 = same volatility as market)
+ */
+export function calculateBeta(
+    fundHistory: { date: string; value: number }[],
+    benchmarkHistory: { date: string; value: number }[]
+): number | undefined {
+    if (fundHistory.length < 30 || benchmarkHistory.length < 30) {
+        // Not enough data for reliable calculation
+        return undefined;
+    }
+    
+    // Align dates (only use dates that exist in both datasets)
+    const fundMap = new Map(fundHistory.map(h => [h.date, h.value]));
+    const benchmarkMap = new Map(benchmarkHistory.map(h => [h.date, h.value]));
+    
+    const commonDates = fundHistory
+        .map(h => h.date)
+        .filter(date => benchmarkMap.has(date))
+        .sort();
+    
+    if (commonDates.length < 30) {
+        return undefined; // Not enough overlapping data
+    }
+    
+    // Calculate returns for common dates
+    const fundReturns: number[] = [];
+    const benchmarkReturns: number[] = [];
+    
+    for (let i = 1; i < commonDates.length; i++) {
+        const prevDate = commonDates[i - 1];
+        const currDate = commonDates[i];
+        
+        const fundPrev = fundMap.get(prevDate)!;
+        const fundCurr = fundMap.get(currDate)!;
+        const benchPrev = benchmarkMap.get(prevDate)!;
+        const benchCurr = benchmarkMap.get(currDate)!;
+        
+        fundReturns.push(Math.log(fundCurr / fundPrev));
+        benchmarkReturns.push(Math.log(benchCurr / benchPrev));
+    }
+    
+    // Beta = Cov(fund, benchmark) / Var(benchmark)
+    const covariance = calculateCovariance(fundReturns, benchmarkReturns);
+    const benchmarkVariance = Math.pow(calculateStdDev(benchmarkReturns), 2);
+    
+    if (benchmarkVariance === 0) return undefined;
+    
+    return covariance / benchmarkVariance;
+}
+
+/**
+ * Calculate Alpha (excess return vs benchmark)
+ * Alpha = Fund Return - (Risk Free Rate + Beta × (Benchmark Return - Risk Free Rate))
+ * 
+ * @param fundHistory - Fund price history
+ * @param benchmarkHistory - Benchmark price history
+ * @param riskFreeRate - Annual risk-free rate (default 3%)
+ * @returns Alpha value (annualized percentage)
+ */
+export function calculateAlpha(
+    fundHistory: { date: string; value: number }[],
+    benchmarkHistory: { date: string; value: number }[],
+    riskFreeRate: number = 0.03 // 3% default
+): number | undefined {
+    if (fundHistory.length < 2 || benchmarkHistory.length < 2) {
+        return undefined;
+    }
+    
+    // Calculate Beta first
+    const beta = calculateBeta(fundHistory, benchmarkHistory);
+    if (beta === undefined) return undefined;
+    
+    // Calculate annualized returns
+    const fundFirst = fundHistory[0].value;
+    const fundLast = fundHistory[fundHistory.length - 1].value;
+    const fundDays = (new Date(fundHistory[fundHistory.length - 1].date).getTime() - 
+                     new Date(fundHistory[0].date).getTime()) / (1000 * 60 * 60 * 24);
+    const fundYears = fundDays / 365.25;
+    const fundReturn = fundYears > 0 ? (Math.pow(fundLast / fundFirst, 1 / fundYears) - 1) : 0;
+    
+    const benchFirst = benchmarkHistory[0].value;
+    const benchLast = benchmarkHistory[benchmarkHistory.length - 1].value;
+    const benchDays = (new Date(benchmarkHistory[benchmarkHistory.length - 1].date).getTime() - 
+                      new Date(benchmarkHistory[0].date).getTime()) / (1000 * 60 * 60 * 24);
+    const benchYears = benchDays / 365.25;
+    const benchReturn = benchYears > 0 ? (Math.pow(benchLast / benchFirst, 1 / benchYears) - 1) : 0;
+    
+    // Alpha = R_fund - (R_f + β × (R_bench - R_f))
+    const alpha = fundReturn - (riskFreeRate + beta * (benchReturn - riskFreeRate));
+    
+    return alpha * 100; // Return as percentage
+}
+
+/**
+ * Calculate Sharpe Ratio (risk-adjusted return)
+ * Sharpe = (Return - Risk Free Rate) / Standard Deviation
+ * 
+ * @param history - Fund price history
+ * @param riskFreeRate - Annual risk-free rate (default 3%)
+ * @returns Sharpe ratio (higher is better, >1.0 is good)
+ */
+export function calculateSharpeRatio(
+    history: { date: string; value: number }[],
+    riskFreeRate: number = 0.03 // 3% default
+): number | undefined {
+    if (history.length < 2) return undefined;
+    
+    // Calculate annualized return
+    const first = history[0].value;
+    const last = history[history.length - 1].value;
+    const days = (new Date(history[history.length - 1].date).getTime() - 
+                 new Date(history[0].date).getTime()) / (1000 * 60 * 60 * 24);
+    const years = days / 365.25;
+    const annualizedReturn = years > 0 ? (Math.pow(last / first, 1 / years) - 1) : 0;
+    
+    // Calculate annualized volatility
+    const dailyReturns = calculateDailyLogReturns(history);
+    const dailyStdDev = calculateStdDev(dailyReturns);
+    const annualizedVolatility = dailyStdDev * Math.sqrt(252); // 252 trading days
+    
+    if (annualizedVolatility === 0) return undefined;
+    
+    // Sharpe = (Return - RiskFreeRate) / Volatility
+    return (annualizedReturn - riskFreeRate) / annualizedVolatility;
+}
+
+/**
+ * Calculate all advanced risk metrics at once
+ * Returns calculated metrics only if API didn't provide them
+ * 
+ * @param fundHistory - Fund price history
+ * @param benchmarkHistory - Optional benchmark for Alpha/Beta
+ * @param riskFreeRate - Annual risk-free rate (default 3%)
+ */
+export function calculateAdvancedRiskMetrics(
+    fundHistory: { date: string; value: number }[],
+    benchmarkHistory?: { date: string; value: number }[],
+    riskFreeRate: number = 0.03
+): {
+    alpha3y?: number;
+    beta3y?: number;
+    sharpe3y?: number;
+    calculated: boolean; // Flag to indicate these are calculated, not from API
+} {
+    const metrics: {
+        alpha3y?: number;
+        beta3y?: number;
+        sharpe3y?: number;
+        calculated: boolean;
+    } = { calculated: true };
+    
+    // Calculate Sharpe (always possible with just fund history)
+    const sharpe = calculateSharpeRatio(fundHistory, riskFreeRate);
+    if (sharpe !== undefined) {
+        metrics.sharpe3y = sharpe;
+    }
+    
+    // Calculate Beta and Alpha if benchmark provided
+    if (benchmarkHistory && benchmarkHistory.length > 30) {
+        const beta = calculateBeta(fundHistory, benchmarkHistory);
+        if (beta !== undefined) {
+            metrics.beta3y = beta;
+        }
+        
+        const alpha = calculateAlpha(fundHistory, benchmarkHistory, riskFreeRate);
+        if (alpha !== undefined) {
+            metrics.alpha3y = alpha;
+        }
+    }
+    
+    return metrics;
+}
+

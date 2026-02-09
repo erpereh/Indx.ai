@@ -1,69 +1,46 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { useInvestments } from '@/context/InvestmentContext';
+import React, { useState } from 'react';
+import { usePortfolioEngine } from '@/hooks/usePortfolioEngine';
 import { formatCurrency, formatPercentage } from '@/lib/calculations';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+} from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend
+);
 
 type ViewMode = 'monthly' | 'yearly';
 
-interface PeriodGain {
-    period: string;
-    invested: number;
-    value: number;
-    gain: number;
-    gainPercent: number;
-}
-
 export default function GainsSection() {
-    const { history, portfolioSummary } = useInvestments();
     const [viewMode, setViewMode] = useState<ViewMode>('monthly');
+    
+    // Usar hook centralizado para obtener todos los datos procesados
+    const { summaryData, chartData, periodGains, cumulativePL, loading, error } = usePortfolioEngine(viewMode);
 
-    // Calculate gains per period
-    const periodGains = useMemo(() => {
-        if (!history || history.length === 0) return [];
-
-        const gains: PeriodGain[] = [];
-        const sortedHistory = [...history].sort((a, b) =>
-            new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-
-        // Group by period
-        const grouped = new Map<string, typeof sortedHistory>();
-        sortedHistory.forEach(entry => {
-            const date = new Date(entry.date);
-            const key = viewMode === 'monthly'
-                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-                : `${date.getFullYear()}`;
-
-            if (!grouped.has(key)) {
-                grouped.set(key, []);
-            }
-            grouped.get(key)!.push(entry);
-        });
-
-        // Calculate gains for each period
-        grouped.forEach((entries, period) => {
-            const lastEntry = entries[entries.length - 1];
-            gains.push({
-                period,
-                invested: lastEntry.totalInvested,
-                value: lastEntry.totalValue,
-                gain: lastEntry.totalGain,
-                gainPercent: lastEntry.totalInvested > 0
-                    ? (lastEntry.totalGain / lastEntry.totalInvested) * 100
-                    : 0,
-            });
-        });
-
-        return gains.sort((a, b) => a.period.localeCompare(b.period));
-    }, [history, viewMode]);
+    // Mostrar error si existe (pero mantener la estructura visible)
+    if (error && !loading) {
+        console.error('[GainsSection] Error loading data:', error);
+    }
 
     // Summary metrics
     const summaryCards = [
         {
             title: 'Total Invertido',
-            value: formatCurrency(portfolioSummary.totalInvested),
+            value: formatCurrency(summaryData.totalInvested),
             icon: (
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -72,7 +49,7 @@ export default function GainsSection() {
         },
         {
             title: 'Valor Actual',
-            value: formatCurrency(portfolioSummary.totalValue),
+            value: formatCurrency(summaryData.totalValue),
             icon: (
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -81,8 +58,8 @@ export default function GainsSection() {
         },
         {
             title: 'Beneficio Neto',
-            value: formatCurrency(portfolioSummary.totalGainLoss),
-            change: portfolioSummary.totalGainLoss,
+            value: formatCurrency(summaryData.totalGain),
+            change: summaryData.totalGain,
             icon: (
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -91,8 +68,8 @@ export default function GainsSection() {
         },
         {
             title: 'Rentabilidad',
-            value: formatPercentage(portfolioSummary.totalGainLossPercent),
-            change: portfolioSummary.totalGainLoss,
+            value: formatPercentage(summaryData.totalGainPercent),
+            change: summaryData.totalGain,
             icon: (
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -101,41 +78,46 @@ export default function GainsSection() {
         },
     ];
 
-    // Chart data
-    const chartData = {
+    // Bar Chart: Rentabilidad por periodo (mensual o anual, segun toggle)
+    const barChartData = {
         labels: periodGains.map(p => {
             if (viewMode === 'monthly') {
                 const [year, month] = p.period.split('-');
                 const date = new Date(parseInt(year), parseInt(month) - 1);
-                return date.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+                return date.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
             }
             return p.period;
         }),
         datasets: [
             {
-                label: 'Ganancias',
-                data: periodGains.map(p => p.gain),
+                label: 'Rentabilidad',
+                data: periodGains.map(p => p.gainPercent),
                 backgroundColor: periodGains.map(p =>
-                    p.gain >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)' // Emerald : Red
+                    p.gainPercent >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'
                 ),
                 borderColor: periodGains.map(p =>
-                    p.gain >= 0 ? '#10b981' : '#ef4444' // Emerald : Red
+                    p.gainPercent >= 0 ? '#10b981' : '#ef4444'
                 ),
-                borderWidth: 1.5,
-                borderRadius: 4,
+                borderWidth: 1,
+                borderRadius: 6,
+                borderSkipped: false,
             },
         ],
     };
 
-    const chartOptions = {
+    const barChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: {
                 display: false,
             },
+            datalabels: {
+                display: false,
+            },
             tooltip: {
-                backgroundColor: '#1e293b',
+                enabled: true,
+                backgroundColor: '#0f172a',
                 titleColor: '#f8fafc',
                 bodyColor: '#cbd5e1',
                 borderColor: '#334155',
@@ -145,7 +127,7 @@ export default function GainsSection() {
                 callbacks: {
                     label: (context: any) => {
                         const value = context.parsed.y;
-                        return `Ganancia: ${formatCurrency(value)}`;
+                        return `Rentabilidad: ${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
                     },
                 },
             },
@@ -158,36 +140,44 @@ export default function GainsSection() {
                 ticks: {
                     color: '#94a3b8',
                     font: {
-                        size: 11,
+                        size: viewMode === 'yearly' ? 13 : 11,
+                        weight: 'bold' as const,
                     },
+                    maxRotation: viewMode === 'monthly' ? 45 : 0,
+                    minRotation: viewMode === 'monthly' ? 45 : 0,
+                    autoSkip: viewMode === 'monthly',
+                    maxTicksLimit: viewMode === 'monthly' ? 12 : undefined,
                 },
             },
             y: {
-                beginAtZero: true,
                 grid: {
                     color: (context: any) => {
                         if (context.tick && context.tick.value === 0) {
-                            return '#64748b'; // Zero line color
+                            return '#64748b';
                         }
                         return 'rgba(51, 65, 85, 0.2)';
                     },
                     lineWidth: (context: any) => {
                         if (context.tick && context.tick.value === 0) {
-                            return 1.5;
+                            return 2;
                         }
                         return 1;
-                    }
+                    },
                 },
                 ticks: {
                     color: '#94a3b8',
-                    callback: (value: any) => formatCurrency(value),
+                    font: {
+                        size: 11,
+                    },
+                    maxTicksLimit: 8,
+                    callback: (value: any) => `${value >= 0 ? '+' : ''}${Number(value).toFixed(1)}%`,
                 },
             },
         },
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-4 animate-fade-in">
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {summaryCards.map((card, index) => {
@@ -205,9 +195,9 @@ export default function GainsSection() {
                                 {card.change !== undefined && (
                                     <span className={`text-xs font-semibold px-2 py-1 rounded ${isPositive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
                                         }`}>
-                                        {isPositive ? '+' : ''}{formatPercentage(
-                                            portfolioSummary.totalInvested > 0
-                                                ? (card.change / portfolioSummary.totalInvested) * 100
+                                        {formatPercentage(
+                                            summaryData.totalInvested > 0
+                                                ? (card.change / summaryData.totalInvested) * 100
                                                 : 0
                                         )}
                                     </span>
@@ -220,10 +210,10 @@ export default function GainsSection() {
                 })}
             </div>
 
-            {/* View Mode Toggle */}
+            {/* Chart Title + Toggle */}
             <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-text-primary">
-                    Evolución de Ganancias
+                    {viewMode === 'monthly' ? 'Rentabilidad Mensual' : 'Rentabilidad Anual'}
                 </h3>
                 <div className="flex bg-background border border-brand-border rounded-lg p-1">
                     <button
@@ -247,11 +237,18 @@ export default function GainsSection() {
                 </div>
             </div>
 
-            {/* Chart */}
+            {/* Bar Chart */}
             <div className="card-premium rounded-2xl p-6">
-                {periodGains.length > 0 ? (
+                {loading ? (
+                    <div className="h-80 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+                            <p className="text-text-tertiary text-sm">Cargando datos de mercado...</p>
+                        </div>
+                    </div>
+                ) : periodGains.length > 0 ? (
                     <div className="h-80">
-                        <Bar data={chartData} options={chartOptions} />
+                        <Bar data={barChartData} options={barChartOptions} />
                     </div>
                 ) : (
                     <div className="h-80 flex items-center justify-center text-text-tertiary">
@@ -281,7 +278,10 @@ export default function GainsSection() {
                                     Valor
                                 </th>
                                 <th className="px-6 py-3 text-right text-xs font-semibold text-text-tertiary uppercase tracking-wider">
-                                    Ganancia
+                                    Ganancia (Período)
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-semibold text-text-tertiary uppercase tracking-wider">
+                                    P&L Acumulado
                                 </th>
                                 <th className="px-6 py-3 text-right text-xs font-semibold text-text-tertiary uppercase tracking-wider">
                                     Rentabilidad
@@ -289,47 +289,67 @@ export default function GainsSection() {
                             </tr>
                         </thead>
                         <tbody>
-                            {periodGains.map((period, index) => {
-                                const isPositive = period.gain >= 0;
-                                return (
-                                    <tr key={index} className="border-b border-surface-light/20 hover:bg-surface/30 transition-colors">
-                                        <td className="px-6 py-4 text-sm font-medium text-text-primary">
-                                            {viewMode === 'monthly' ? (
-                                                (() => {
-                                                    const [year, month] = period.period.split('-');
-                                                    const date = new Date(parseInt(year), parseInt(month) - 1);
-                                                    return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-                                                })()
-                                            ) : (
-                                                period.period
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text-secondary text-right tabular-nums">
-                                            {formatCurrency(period.invested)}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-text-secondary text-right tabular-nums">
-                                            {formatCurrency(period.value)}
-                                        </td>
-                                        <td className={`px-6 py-4 text-sm text-right font-semibold tabular-nums ${isPositive ? 'text-success' : 'text-danger'
-                                            }`}>
-                                            {isPositive ? '+' : ''}{formatCurrency(period.gain)}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-right tabular-nums">
-                                            <span className={`px-2 py-1 rounded text-xs font-semibold ${isPositive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-12">
+                                        <div className="flex items-center justify-center">
+                                            <div className="text-center">
+                                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-primary mx-auto mb-3"></div>
+                                                <p className="text-text-tertiary text-sm">Cargando desglose...</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : periodGains.length > 0 ? (
+                                periodGains.map((period, index) => {
+                                    const isPositive = period.gain >= 0;
+                                    const cumulativeValue = cumulativePL[index];
+                                    const isCumulativePositive = cumulativeValue >= 0;
+                                    return (
+                                        <tr key={index} className="border-b border-surface-light/20 hover:bg-surface/30 transition-colors">
+                                            <td className="px-6 py-4 text-sm font-medium text-text-primary">
+                                                {viewMode === 'monthly' ? (
+                                                    (() => {
+                                                        const [year, month] = period.period.split('-');
+                                                        const date = new Date(parseInt(year), parseInt(month) - 1);
+                                                        return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                                                    })()
+                                                ) : (
+                                                    period.period
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-text-secondary text-right tabular-nums">
+                                                {formatCurrency(period.invested)}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-text-secondary text-right tabular-nums">
+                                                {formatCurrency(period.value)}
+                                            </td>
+                                            <td className={`px-6 py-4 text-sm text-right font-semibold tabular-nums ${isPositive ? 'text-success' : 'text-danger'
                                                 }`}>
-                                                {isPositive ? '+' : ''}{formatPercentage(period.gainPercent)}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                                                {isPositive ? '+' : ''}{formatCurrency(period.gain)}
+                                            </td>
+                                            <td className={`px-6 py-4 text-sm text-right font-bold tabular-nums ${isCumulativePositive ? 'text-success' : 'text-danger'
+                                                }`}>
+                                                {isCumulativePositive ? '+' : ''}{formatCurrency(cumulativeValue)}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-right tabular-nums">
+                                                <span className={`px-2 py-1 rounded text-xs font-semibold ${isPositive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+                                                    }`}>
+                                                    {formatPercentage(period.gainPercent)}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                <tr>
+                                    <td colSpan={6} className="py-12 text-center text-text-tertiary">
+                                        Sin datos para mostrar
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
-                    {periodGains.length === 0 && (
-                        <div className="py-12 text-center text-text-tertiary">
-                            Sin datos para mostrar
-                        </div>
-                    )}
                 </div>
             </div>
         </div>

@@ -11,7 +11,9 @@ import InvestmentsList from '@/components/InvestmentsList';
 import GainsSection from '@/components/GainsSection';
 import AddInvestmentModal from '@/components/AddInvestmentModal';
 import FundDetailsSection from '@/components/FundDetailsSection';
+import AuthView from '@/components/AuthView';
 import { useInvestments } from '@/context/InvestmentContext';
+import { useAuth } from '@/context/AuthContext';
 import { Investment } from '@/lib/types';
 
 export default function Home() {
@@ -19,6 +21,7 @@ export default function Home() {
     const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
     const [activeTab, setActiveTab] = useState<'dashboard' | 'investments' | 'fund-details'>('dashboard');
     const { refreshPrices, loading } = useInvestments();
+    const { user, loading: authLoading } = useAuth();
 
     const handleEditInvestment = (investment: Investment) => {
         setEditingInvestment(investment);
@@ -50,6 +53,23 @@ export default function Home() {
     };
 
     const headerInfo = getHeaderInfo();
+
+    // Auth loading state
+    if (authLoading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-text-tertiary">Cargando...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Not authenticated - show login
+    if (!user) {
+        return <AuthView />;
+    }
 
     return (
         <div className="flex h-screen w-full bg-background overflow-hidden">
