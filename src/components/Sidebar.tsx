@@ -7,10 +7,20 @@ import { LogOut } from 'lucide-react';
 interface SidebarProps {
     activeTab: 'dashboard' | 'investments' | 'fund-details';
     onTabChange: (tab: 'dashboard' | 'investments' | 'fund-details') => void;
+    isMobileMenuOpen?: boolean;
+    onMobileMenuClose?: () => void;
 }
 
-export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export default function Sidebar({ activeTab, onTabChange, isMobileMenuOpen = false, onMobileMenuClose }: SidebarProps) {
     const { user, signOut } = useAuth();
+
+    const handleTabChange = (tab: 'dashboard' | 'investments' | 'fund-details') => {
+        onTabChange(tab);
+        // Cerrar menú móvil al seleccionar una opción
+        if (onMobileMenuClose) {
+            onMobileMenuClose();
+        }
+    };
     const navItems = [
         { name: 'Resumen', id: 'dashboard', icon: 'House' },
         { name: 'Inversiones', id: 'investments', icon: 'ChartLine' },
@@ -18,70 +28,153 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     ];
 
     return (
-        <div className="flex-shrink-0 w-64 h-screen sticky top-0">
-            <div className="flex h-full flex-col justify-between bg-background border-r border-brand-border p-6">
-                <div className="flex flex-col gap-8">
-                    {/* Logo */}
-                    <div className="flex items-center gap-3 px-2">
-                        <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center shadow-lg shadow-brand-primary/20">
-                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                            </svg>
+        <>
+            {/* Mobile Menu Overlay */}
+            {isMobileMenuOpen && (
+                <div
+                    className="mobile-menu-overlay active lg:hidden"
+                    onClick={onMobileMenuClose}
+                />
+            )}
+
+            {/* Desktop Sidebar - Hidden on mobile */}
+            <div className="hide-mobile flex-shrink-0 w-64 h-screen sticky top-0">
+                <div className="flex h-full flex-col justify-between bg-background border-r border-brand-border p-6">
+                    <div className="flex flex-col gap-8">
+                        {/* Logo */}
+                        <div className="flex items-center gap-3 px-2">
+                            <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
+                            </div>
+                            <h1 className="text-xl font-bold text-text-primary tracking-tight">Indx.ai</h1>
                         </div>
-                        <h1 className="text-xl font-bold text-text-primary tracking-tight">Indx.ai</h1>
+
+                        {/* Navigation */}
+                        <nav className="flex flex-col gap-2">
+                            {navItems.map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => handleTabChange(item.id as 'dashboard' | 'investments' | 'fund-details')}
+                                    className={`
+                                        flex items-center gap-3 px-4 py-3 rounded-xl 
+                                        transition-all duration-200 ease-smooth w-full text-left
+                                        ${activeTab === item.id
+                                            ? 'bg-brand-primary/10 border-l-2 border-brand-primary text-brand-primary'
+                                            : 'text-text-tertiary hover:text-text-primary hover:bg-surface/50'
+                                        }
+                                    `}
+                                >
+                                    <div className={`transition-colors ${activeTab === item.id ? 'text-brand-primary' : ''}`}>
+                                        {renderIcon(item.icon)}
+                                    </div>
+                                    <span className={`text-sm font-medium ${activeTab === item.id ? 'font-semibold' : ''}`}>{item.name}</span>
+                                </button>
+                            ))}
+                        </nav>
                     </div>
 
-                    {/* Navigation */}
-                    <nav className="flex flex-col gap-2">
-                        {navItems.map((item) => (
-                            <button
-                                key={item.id}
-                                onClick={() => onTabChange(item.id as 'dashboard' | 'investments')}
-                                className={`
-                                    flex items-center gap-3 px-4 py-3 rounded-xl 
-                                    transition-all duration-200 ease-smooth w-full text-left
-                                    ${activeTab === item.id
-                                        ? 'bg-brand-primary/10 border-l-2 border-brand-primary text-brand-primary'
-                                        : 'text-text-tertiary hover:text-text-primary hover:bg-surface/50'
-                                    }
-                                `}
-                            >
-                                <div className={`transition-colors ${activeTab === item.id ? 'text-brand-primary' : ''}`}>
-                                    {renderIcon(item.icon)}
-                                </div>
-                                <span className={`text-sm font-medium ${activeTab === item.id ? 'font-semibold' : ''}`}>{item.name}</span>
-                            </button>
-                        ))}
-                    </nav>
-                </div>
-
-                {/* Footer - User Info & Logout */}
-                <div className="flex flex-col gap-3">
-                    <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
-                        <p className="text-xs text-text-tertiary mb-1">Estado del sistema</p>
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
-                            <p className="text-xs font-medium text-text-secondary">Conectado</p>
-                        </div>
-                    </div>
-
-                    {user && (
+                    {/* Footer - User Info & Logout */}
+                    <div className="flex flex-col gap-3">
                         <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
-                            <p className="text-xs text-text-tertiary truncate mb-2" title={user.email}>
-                                {user.email}
-                            </p>
-                            <button
-                                onClick={signOut}
-                                className="flex items-center gap-2 w-full text-xs text-text-tertiary hover:text-red-400 transition-colors duration-200"
-                            >
-                                <LogOut className="w-3.5 h-3.5" />
-                                <span>Cerrar Sesión</span>
-                            </button>
+                            <p className="text-xs text-text-tertiary mb-1">Estado del sistema</p>
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+                                <p className="text-xs font-medium text-text-secondary">Conectado</p>
+                            </div>
                         </div>
-                    )}
+
+                        {user && (
+                            <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
+                                <p className="text-xs text-text-tertiary truncate mb-2" title={user.email}>
+                                    {user.email}
+                                </p>
+                                <button
+                                    onClick={signOut}
+                                    className="flex items-center gap-2 w-full text-xs text-text-tertiary hover:text-red-400 transition-colors duration-200"
+                                >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    <span>Cerrar Sesión</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
+
+            {/* Mobile Sidebar - Slide-in menu */}
+            <div
+                className={`
+                    hide-desktop fixed top-0 left-0 h-screen w-64 z-50 bg-background border-r border-brand-border
+                    ${isMobileMenuOpen ? 'mobile-menu-enter' : 'mobile-menu-exit'}
+                    ${!isMobileMenuOpen ? 'pointer-events-none' : ''}
+                `}
+            >
+                <div className="flex h-full flex-col justify-between p-6">
+                    <div className="flex flex-col gap-8">
+                        {/* Logo */}
+                        <div className="flex items-center gap-3 px-2">
+                            <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                </svg>
+                            </div>
+                            <h1 className="text-xl font-bold text-text-primary tracking-tight">Indx.ai</h1>
+                        </div>
+
+                        {/* Navigation */}
+                        <nav className="flex flex-col gap-2">
+                            {navItems.map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => handleTabChange(item.id as 'dashboard' | 'investments' | 'fund-details')}
+                                    className={`
+                                        flex items-center gap-3 px-4 py-3 rounded-xl 
+                                        transition-all duration-200 ease-smooth w-full text-left
+                                        ${activeTab === item.id
+                                            ? 'bg-brand-primary/10 border-l-2 border-brand-primary text-brand-primary'
+                                            : 'text-text-tertiary hover:text-text-primary hover:bg-surface/50'
+                                        }
+                                    `}
+                                >
+                                    <div className={`transition-colors ${activeTab === item.id ? 'text-brand-primary' : ''}`}>
+                                        {renderIcon(item.icon)}
+                                    </div>
+                                    <span className={`text-sm font-medium ${activeTab === item.id ? 'font-semibold' : ''}`}>{item.name}</span>
+                                </button>
+                            ))}
+                        </nav>
+                    </div>
+
+                    {/* Footer - User Info & Logout */}
+                    <div className="flex flex-col gap-3">
+                        <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
+                            <p className="text-xs text-text-tertiary mb-1">Estado del sistema</p>
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+                                <p className="text-xs font-medium text-text-secondary">Conectado</p>
+                            </div>
+                        </div>
+
+                        {user && (
+                            <div className="px-4 py-3 rounded-xl bg-surface/50 border border-brand-border">
+                                <p className="text-xs text-text-tertiary truncate mb-2" title={user.email}>
+                                    {user.email}
+                                </p>
+                                <button
+                                    onClick={signOut}
+                                    className="flex items-center gap-2 w-full text-xs text-text-tertiary hover:text-red-400 transition-colors duration-200"
+                                >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    <span>Cerrar Sesión</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </>
     );
 }
 

@@ -20,6 +20,7 @@ export default function Home() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
     const [activeTab, setActiveTab] = useState<'dashboard' | 'investments' | 'fund-details'>('dashboard');
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { refreshPrices, loading } = useInvestments();
     const { user, loading: authLoading } = useAuth();
 
@@ -73,7 +74,12 @@ export default function Home() {
 
     return (
         <div className="flex h-screen w-full bg-background overflow-hidden">
-            <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+            <Sidebar
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                isMobileMenuOpen={isMobileMenuOpen}
+                onMobileMenuClose={() => setIsMobileMenuOpen(false)}
+            />
 
             <main className="flex-1 overflow-y-auto bg-background">
                 <div className="min-h-full">
@@ -83,9 +89,10 @@ export default function Home() {
                         onAddInvestment={() => setIsModalOpen(true)}
                         onRefreshPrices={() => refreshPrices()}
                         loading={loading}
+                        onMobileMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                     />
 
-                    <div className="max-w-[1600px] mx-auto px-8 py-6 space-y-8">
+                    <div className="max-w-[1600px] mx-auto px-4 sm:px-8 py-6 space-y-8">
                         {activeTab === 'dashboard' ? (
                             <>
                                 {/* KPI Cards */}

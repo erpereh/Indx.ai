@@ -8,6 +8,7 @@ interface HeaderProps {
     loading: boolean;
     title?: string;
     subtitle?: string;
+    onMobileMenuToggle?: () => void;
 }
 
 export default function Header({
@@ -15,7 +16,8 @@ export default function Header({
     onRefreshPrices,
     loading,
     title = 'Resumen Global',
-    subtitle = 'Visión general de tu patrimonio'
+    subtitle = 'Visión general de tu patrimonio',
+    onMobileMenuToggle
 }: HeaderProps) {
     const [isScrolled, setIsScrolled] = useState(false);
 
@@ -47,19 +49,30 @@ export default function Header({
                 ${isScrolled ? 'shadow-md bg-background/95 backdrop-blur-sm' : ''}
             `}
         >
-            <div className="w-full px-8 py-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-2xl font-bold text-text-primary tracking-tight">{title}</h2>
-                        {subtitle && <p className="text-sm text-text-tertiary mt-0.5">{subtitle}</p>}
+            <div className="w-full px-4 sm:px-8 py-4">
+                <div className="flex items-center justify-between gap-4">
+                    {/* Mobile Menu Button */}
+                    <button
+                        onClick={onMobileMenuToggle}
+                        className="lg:hidden p-2 rounded-lg hover:bg-surface transition-colors"
+                        aria-label="Toggle menu"
+                    >
+                        <svg className="w-6 h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+
+                    <div className="flex-1">
+                        <h2 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">{title}</h2>
+                        {subtitle && <p className="text-xs sm:text-sm text-text-tertiary mt-0.5 hidden sm:block">{subtitle}</p>}
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
                         <button
                             onClick={onRefreshPrices}
                             disabled={loading}
                             className="
-                                px-4 py-2 rounded-lg 
+                                px-3 sm:px-4 py-2 rounded-lg 
                                 bg-surface hover:bg-surface-light text-text-secondary
                                 border border-brand-border hover:border-text-tertiary
                                 transition-all duration-200
@@ -89,7 +102,7 @@ export default function Header({
                         <button
                             onClick={onAddInvestment}
                             className="
-                                px-4 py-2 rounded-lg font-medium text-sm
+                                px-3 sm:px-4 py-2 rounded-lg font-medium text-sm
                                 bg-brand-primary hover:bg-brand-primary-hover
                                 text-white shadow-sm
                                 hover:shadow-md hover:-translate-y-0.5
@@ -100,7 +113,7 @@ export default function Header({
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                             </svg>
-                            <span>Nueva Inversión</span>
+                            <span className="hide-sm">Nueva Inversión</span>
                         </button>
                     </div>
                 </div>
