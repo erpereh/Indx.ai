@@ -66,7 +66,7 @@ export async function fetchUserInvestments(userId: string): Promise<Investment[]
         .order('purchase_date', { ascending: true });
 
     if (error) {
-        console.error('Error fetching investments from Supabase:', error);
+        console.error('Error fetching investments from Supabase:', error.message, error.code, error.details, error.hint);
         throw error;
     }
 
@@ -88,7 +88,7 @@ export async function upsertInvestment(userId: string, inv: Investment): Promise
         .single();
 
     if (error) {
-        console.error('Error upserting investment to Supabase:', error);
+        console.error('Error upserting investment to Supabase:', error.message, error.code, error.details, error.hint);
         throw error;
     }
 
@@ -107,14 +107,14 @@ export async function deleteSupabaseInvestment(investmentId: string): Promise<vo
         .eq('id', investmentId);
 
     if (error) {
-        console.error('Error deleting investment from Supabase:', error);
+        console.error('Error deleting investment from Supabase:', error.message, error.code, error.details, error.hint);
         throw error;
     }
 }
 
 /**
  * Bulk insert investments (used for localStorage -> Supabase migration on first login).
- * Generates new UUIDs for each investment to avoid ID collisions.
+ * Omits IDs so Supabase generates proper UUIDs via gen_random_uuid().
  */
 export async function bulkInsertInvestments(userId: string, investments: Investment[]): Promise<Investment[]> {
     if (investments.length === 0) return [];
@@ -122,22 +122,29 @@ export async function bulkInsertInvestments(userId: string, investments: Investm
     const supabase = createClient();
 
     const rows = investments.map((inv) => ({
-        // Generate a proper UUID for each investment
         user_id: userId,
-        isin: inv.isin.trim().toUpperCase(),
-        name: inv.name,
-        shares: inv.shares,
-        total_investment: inv.initialInvestment,
+        isin: (inv.isin || '').trim().toUpperCase(),
+        name: inv.name || '',
+        shares: Number(inv.shares) || 0,
+        total_investment: Number(inv.initialInvestment) || 0,
         purchase_date: inv.purchaseDate,
     }));
 
+    // Filter out rows with missing required fields
+    const validRows = rows.filter(row => row.isin && row.purchase_date);
+
+    if (validRows.length === 0) {
+        console.warn('No valid investments to migrate to Supabase');
+        return [];
+    }
+
     const { data, error } = await supabase
         .from('investments')
-        .insert(rows)
+        .insert(validRows)
         .select();
 
     if (error) {
-        console.error('Error bulk inserting investments to Supabase:', error);
+        console.error('Error bulk inserting investments to Supabase:', error.message, error.code, error.details, error.hint);
         throw error;
     }
 

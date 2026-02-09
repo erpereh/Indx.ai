@@ -124,8 +124,9 @@ export function InvestmentProvider({ children }: { children: React.ReactNode }) 
                             saveInvestments(cleaned);
                             await refreshPricesInternal(cleaned);
                             console.info(`Migrated ${migratedInvestments.length} investments to Supabase.`);
-                        } catch (migrationError) {
-                            console.error('Migration failed, using localStorage as fallback:', migrationError);
+                        } catch (migrationError: unknown) {
+                            const errMsg = migrationError instanceof Error ? migrationError.message : String(migrationError);
+                            console.error('Migration failed, using localStorage as fallback:', errMsg);
                             // Fallback: use localStorage data without Supabase
                             const cleaned = localInvestments.map(inv => ({
                                 ...inv,
