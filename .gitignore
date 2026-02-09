@@ -34,3 +34,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# logs
+*.log
+
+# archivos temporales
+nul
+
+# scripts de debug/testing (mantener si son necesarios)
+# test-*.js
+# debug-*.js
+# verify-*.js

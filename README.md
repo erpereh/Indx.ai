@@ -1,18 +1,29 @@
-# Indx.ai - Dashboard de Inversiones
+# Indx.ai - Dashboard de Inversiones 📊
 
-Dashboard completo de inversiones personales construido con Next.js, diseñado para seguir tu cartera de fondos con actualización automática de precios.
+> Dashboard completo de inversiones personales construido con Next.js, diseñado para seguir tu cartera de fondos indexados con actualización automática de precios y análisis en tiempo real.
+
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8)](https://tailwindcss.com/)
+
+---
 
 ## 🚀 Características
 
 - **Dashboard Moderno**: Interfaz oscura con paleta azul y diseño fintech profesional
-- **Precios en Tiempo Real**: Obtención automática de precios desde Financial Times
-- **Visualización con Gráficos**: Charts interactivos con Chart.js
+- **Precios en Tiempo Real**: Integración con Yahoo Finance y Financial Times
+- **Visualización Avanzada**: Charts interactivos con Chart.js
   - Gráfico de línea: Evolución de cartera
   - Gráfico de dona: Distribución por inversión
-- **Gestión de Inversiones**: Agregar y eliminar fondos dinámicamente
-- **Cálculos Automáticos**: Totales, ganancias/pérdidas, y rendimientos
-- **Responsive**: Totalmente adaptado para móvil y desktop
-- **Persistencia**: Datos guardados en localStorage
+  - Gráfico de rentabilidad: % acumulado con encadenamiento diario
+- **Detalles de Fondos**: Análisis completo con holdings, sectores y distribución geográfica
+- **Gestión de Inversiones**: Agregar, editar y eliminar fondos dinámicamente
+- **Cálculos Automáticos**: Totales, ganancias/pérdidas y rendimientos
+- **Responsive**: Totalmente adaptado para móvil y desktop con menú hamburguesa
+- **Autenticación**: Sistema de login con Supabase
+- **Persistencia**: Datos guardados en localStorage y PostgreSQL
+
+📚 **[Ver Documentación Técnica Completa](./DOCUMENTACION.md)**
 
 ## 📁 Estructura del Proyecto
 
