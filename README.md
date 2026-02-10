@@ -19,15 +19,17 @@
 
 ### ⚖️ Gestión Activa de Cartera
 - **Calculadora de Rebalanceo**: Define pesos objetivo (%) para tus activos y recibe sugerencias exactas de compra/venta para reequilibrar.
+- **Historial Interactivo**: Visualiza y **elimina transacciones** individuales con un sistema de confirmación sutil.
 - **Persistencia en Nube**: Tus objetivos de rebalanceo y cartera se sincronizan en la nube vía **Supabase**.
 - **Edición Múltiple**: Ajusta varios objetivos simultáneamente con validación en tiempo real.
 
-### � Planificación a Futuro
+### 📈 Planificación a Futuro
 - **Simulador de Proyecciones**: Visualiza el poder del interés compuesto con sliders interactivos.
 - **Escenarios**: Configura aportación mensual, rentabilidad esperada y horizonte temporal.
 
 ### 💻 Tecnología y DX
 - **Datos en Tiempo Real**: Integración con Yahoo Finance y Financial Times (Scraping).
+- **Diagnóstico Inteligente**: Incluye herramientas para debuggear el flujo de autenticación y límites de Supabase.
 - **UI Premium**: Diseño Dark Mode profesional inspirado en apps fintech de alto nivel.
 - **Responsive**: Totalmente adaptado a móvil, tablet y escritorio.
 

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateFundMetrics } from '@/lib/calculations';
+import { getYahooAuth } from '@/lib/yahooAuth';
+import { normalizeFundData, NormalizedFundData } from '@/lib/fundDataNormalizer';
 
 /**
  * GET /api/fund-details?isin=IE000ZYRH0Q7
  * 
  * Obtiene detalles completos de un fondo desde Yahoo Finance.
- * Incluye histórico de precios y métricas calculadas.
- * 
- * MIGRADO DE FINANCIAL TIMES A YAHOO FINANCE
+ * Incluye histórico de precios y metadatos de composición (Asset Class, Region).
  */
 
 // Force dynamic since we're fetching live data
@@ -43,35 +43,43 @@ export async function GET(request: NextRequest) {
 
         console.log(`[FundDetails] Found symbol: ${symbol} for ISIN: ${isin}`);
 
-        // 2. Fetch historical data (last 5 years)
+        // 2. Fetch data in parallel: History + Composition (QuoteSummary)
         const fiveYearsAgo = new Date();
         fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-        
         const fromStr = fiveYearsAgo.toISOString().split('T')[0];
         const toStr = new Date().toISOString().split('T')[0];
 
-        const historyUrl = `${request.nextUrl.origin}/api/yahoo-history?symbol=${encodeURIComponent(symbol)}&from=${fromStr}&to=${toStr}`;
-        const historyResponse = await fetch(historyUrl);
+        // Fetch History
+        const historyPromise = fetch(`${request.nextUrl.origin}/api/yahoo-history?symbol=${encodeURIComponent(symbol)}&from=${fromStr}&to=${toStr}`)
+            .then(res => res.ok ? res.json() : null);
 
-        if (!historyResponse.ok) {
-            console.error(`[FundDetails] Yahoo history failed for ${symbol}`);
-            return NextResponse.json(
-                { error: `No se pudieron obtener datos históricos para ${symbol}` },
-                { status: 404 }
-            );
-        }
+        // Fetch Composition (Directly from Yahoo to enable composition data)
+        const compositionPromise = (async () => {
+            try {
+                const auth = await getYahooAuth();
+                const modules = ["assetProfile", "fundProfile", "topHoldings"].join(",");
+                const yahooUrl = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${modules}&crumb=${encodeURIComponent(auth.crumb)}`;
 
-        const historyData = await historyResponse.json();
-        const history = historyData.history;
+                const res = await fetch(yahooUrl, {
+                    headers: {
+                        "Cookie": auth.cookie,
+                        "User-Agent": "Mozilla/5.0"
+                    }
+                });
 
-        if (!history || history.length === 0) {
-            return NextResponse.json(
-                { error: 'No hay datos históricos disponibles para este fondo' },
-                { status: 404 }
-            );
-        }
+                if (!res.ok) return null;
+                const data = await res.json();
+                const result = data?.quoteSummary?.result?.[0];
+                return result ? normalizeFundData(result) : null;
+            } catch (e) {
+                console.error('[FundDetails] Error fetching composition:', e);
+                return null;
+            }
+        })();
 
-        console.log(`[FundDetails] Retrieved ${history.length} historical data points`);
+        const [historyData, compositionData] = await Promise.all([historyPromise, compositionPromise]);
+
+        const history = historyData?.history || [];
 
         // 3. Calculate metrics from history
         const metrics = calculateFundMetrics(history);
@@ -97,7 +105,12 @@ export async function GET(request: NextRequest) {
                 volatility: metrics.volatility,
                 maxDrawdown: metrics.maxDrawdown,
             } : null,
-            composition: null, // Yahoo Finance doesn't provide composition data
+            composition: compositionData ? {
+                holdings: compositionData.holdings,
+                sectors: compositionData.sectors,
+                regions: compositionData.regions,
+                allocation: compositionData.assetAllocation ? Object.entries(compositionData.assetAllocation).map(([name, weight]) => ({ name, weight: parseFloat(weight) })) : null
+            } : null,
             lastUpdate: new Date().toISOString(),
             source: 'yahoo-finance',
         });
@@ -105,7 +118,7 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error('[FundDetails] Error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        
+
         return NextResponse.json(
             { error: 'Error al obtener datos del fondo', details: errorMessage },
             { status: 500 }

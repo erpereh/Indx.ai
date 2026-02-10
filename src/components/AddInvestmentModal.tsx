@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { useInvestments } from '@/context/InvestmentContext';
 import { Investment } from '@/lib/types';
+import { fetchFundComposition } from '@/lib/priceService';
+import { autoClassifyFund } from '@/lib/autoClassification';
 
 interface AddInvestmentModalProps {
     isOpen: boolean;
@@ -18,8 +20,11 @@ export default function AddInvestmentModal({ isOpen, onClose, editingInvestment 
         shares: '',
         initialInvestment: '',
         purchaseDate: new Date().toISOString().split('T')[0],
+        assetClass: 'Equity',
+        region: 'Global',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [detecting, setDetecting] = useState(false); // Loading state for auto-detection
 
     // Populate form when editing
     React.useEffect(() => {
@@ -30,6 +35,8 @@ export default function AddInvestmentModal({ isOpen, onClose, editingInvestment 
                 shares: editingInvestment.shares.toString(),
                 initialInvestment: editingInvestment.initialInvestment.toString(),
                 purchaseDate: editingInvestment.purchaseDate,
+                assetClass: editingInvestment.assetClass || 'Equity',
+                region: editingInvestment.region || 'Global',
             });
         } else if (isOpen && !editingInvestment) {
             // Reset if opening as new
@@ -39,9 +46,38 @@ export default function AddInvestmentModal({ isOpen, onClose, editingInvestment 
                 shares: '',
                 initialInvestment: '',
                 purchaseDate: new Date().toISOString().split('T')[0],
+                assetClass: 'Equity',
+                region: 'Global',
             });
         }
     }, [isOpen, editingInvestment]);
+
+    // Auto-detect when ISIN is valid (12 chars)
+    React.useEffect(() => {
+        const detect = async () => {
+            if (formData.isin.length === 12) {
+                setDetecting(true);
+                try {
+                    const composition = await fetchFundComposition(formData.isin);
+                    if (composition) {
+                        const { assetClass, region } = autoClassifyFund(composition);
+                        setFormData(prev => ({
+                            ...prev,
+                            assetClass: assetClass || 'Equity',
+                            region: region || 'Global'
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Error auto-detecting fund:', error);
+                } finally {
+                    setDetecting(false);
+                }
+            }
+        };
+
+        const timer = setTimeout(detect, 500); // 500ms debounce
+        return () => clearTimeout(timer);
+    }, [formData.isin]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -72,6 +108,8 @@ export default function AddInvestmentModal({ isOpen, onClose, editingInvestment 
                 shares: parseFloat(formData.shares),
                 initialInvestment: parseFloat(formData.initialInvestment),
                 purchaseDate: formData.purchaseDate,
+                assetClass: formData.assetClass as any,
+                region: formData.region as any,
             });
         } else {
             addInvestment({
@@ -80,6 +118,8 @@ export default function AddInvestmentModal({ isOpen, onClose, editingInvestment 
                 shares: parseFloat(formData.shares),
                 initialInvestment: parseFloat(formData.initialInvestment),
                 purchaseDate: formData.purchaseDate,
+                assetClass: formData.assetClass as any,
+                region: formData.region as any,
             });
         }
 
@@ -154,20 +194,38 @@ export default function AddInvestmentModal({ isOpen, onClose, editingInvestment 
                         <label htmlFor="isin" className="block text-sm font-medium text-gray-300 mb-2">
                             ISIN *
                         </label>
-                        <input
-                            type="text"
-                            id="isin"
-                            value={formData.isin}
-                            onChange={(e) => handleChange('isin', e.target.value)}
-                            className={`w-full px-4 py-3 bg-background rounded-lg border ${errors.isin ? 'border-danger' : 'border-primary-800/30'
-                                } text-white placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors font-mono uppercase`}
-                            placeholder="Ej: IE00B3RBWM25"
-                            maxLength={12}
-                        />
+                        <div className="relative">
+                            <input
+                                type="text"
+                                id="isin"
+                                value={formData.isin}
+                                onChange={(e) => handleChange('isin', e.target.value)}
+                                className={`w-full px-4 py-3 bg-background rounded-lg border ${errors.isin ? 'border-danger' : 'border-primary-800/30'
+                                    } text-white placeholder-gray-500 focus:outline-none focus:border-primary-500 transition-colors font-mono uppercase`}
+                                placeholder="Ej: IE00B3RBWM25"
+                                maxLength={12}
+                            />
+                            {detecting && (
+                                <div className="absolute right-3 top-3 text-primary-400 animate-spin">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
                         {errors.isin && <p className="text-danger text-sm mt-1">{errors.isin}</p>}
-                        <p className="text-gray-500 text-xs mt-1">
-                            Identificador internacional de 12 caracteres
-                        </p>
+                        <div className="flex justify-between items-start mt-1">
+                            <p className="text-gray-500 text-xs">
+                                Identificador internacional de 12 caracteres
+                            </p>
+                            {/* Feedback of detected class */}
+                            {(formData.assetClass !== 'Equity' || formData.region !== 'Global' || detecting) && (
+                                <span className={`text-xs ${detecting ? 'text-gray-400' : 'text-success'}`}>
+                                    {detecting ? 'Detectando...' : `${formData.assetClass} • ${formData.region}`}
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     {/* Shares and Investment Row */}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Investment, PortfolioSummary, HistoryEntry } from '@/lib/types';
+import { Investment, PortfolioSummary, HistoryEntry, Transaction } from '@/lib/types';
 import { calculatePortfolioSummary, reconstructPortfolioHistory } from '@/lib/calculations';
 import { fetchPriceByISIN, fetchFundHistory } from '@/lib/priceService';
 import { loadInvestments, saveInvestments } from '@/lib/storage';
@@ -13,16 +13,21 @@ import {
     upsertInvestment,
     deleteSupabaseInvestment,
     bulkInsertInvestments,
+    fetchUserTransactions,
+    addTransaction,
+    deleteSupabaseTransaction,
 } from '@/lib/supabaseStorage';
 
 interface InvestmentContextType {
     investments: Investment[];
+    transactions: Transaction[];
     history: HistoryEntry[];
     portfolioSummary: PortfolioSummary;
     loading: boolean;
     addInvestment: (investment: Omit<Investment, 'id'>) => Promise<void>;
     editInvestment: (id: string, updatedInvestment: Partial<Investment>) => Promise<void>;
     deleteInvestment: (id: string) => Promise<void>;
+    deleteTransaction: (id: string) => Promise<void>;
     refreshPrices: () => Promise<void>;
 }
 
@@ -30,6 +35,7 @@ const InvestmentContext = createContext<InvestmentContextType | undefined>(undef
 
 export function InvestmentProvider({ children }: { children: React.ReactNode }) {
     const [investments, setInvestments] = useState<Investment[]>([]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
@@ -96,7 +102,14 @@ export function InvestmentProvider({ children }: { children: React.ReactNode }) 
 
             try {
                 // 1. Try to load from Supabase
-                const supabaseInvestments = await fetchUserInvestments(user!.id);
+                const [supabaseInvestments, supabaseTransactions] = await Promise.all([
+                    fetchUserInvestments(user!.id),
+                    fetchUserTransactions(user!.id)
+                ]);
+
+                if (supabaseTransactions.length > 0) {
+                    setTransactions(supabaseTransactions);
+                }
 
                 if (supabaseInvestments.length > 0) {
                     // Supabase has data - use it as the source of truth
@@ -193,8 +206,26 @@ export function InvestmentProvider({ children }: { children: React.ReactNode }) 
         if (user) {
             try {
                 await upsertInvestment(user.id, newInv);
+
+                // Track 'BUY' transaction automatically
+                const newTxn = await addTransaction(user.id, {
+                    investmentId: newInv.id,
+                    type: 'BUY',
+                    date: newInv.purchaseDate,
+                    shares: newInv.shares,
+                    price: newInv.initialInvestment / newInv.shares, // Average price
+                    amount: newInv.initialInvestment,
+                    currency: 'EUR',
+                    assetName: newInv.name,
+                    isin: newInv.isin
+                });
+
+                if (newTxn) {
+                    setTransactions(prev => [newTxn, ...prev]);
+                }
+
             } catch (error) {
-                console.error('Failed to save investment to Supabase:', error);
+                console.error('Failed to save investment/transaction to Supabase:', error);
                 // Investment is still in localStorage + state, will sync later
             }
         }
@@ -232,6 +263,43 @@ export function InvestmentProvider({ children }: { children: React.ReactNode }) 
         if (user && updatedInvestment) {
             try {
                 await upsertInvestment(user.id, updatedInvestment);
+
+                // Logic to detect if we should log a transaction (only if shares changed)
+                const oldShares = investment?.shares || 0;
+                const newShares = updatedInvestment.shares;
+                const shareDiff = newShares - oldShares;
+
+                if (Math.abs(shareDiff) > 0.0001) {
+                    const pricePerShare = updatedInvestment.initialInvestment / newShares; // Crude approx if not provided
+                    // Ideally we'd ask for price, but here we infer or use current price? 
+                    // For now using average cost of whole position as proxy, or we could leave price 0 if unknown.
+
+                    const txnType = shareDiff > 0 ? 'BUY' : 'SELL';
+                    const txnAmount = Math.abs(shareDiff * pricePerShare);
+                    // Note: This amount calculation is imperfect if we don't know the execution price of the difference.
+                    // But for automated tracking it's better than nothing.
+
+                    const newTxn = await addTransaction(user.id, {
+                        investmentId: updatedInvestment.id,
+                        type: txnType,
+                        date: new Date().toISOString().split('T')[0], // Today for edits, or should we use purchaseDate if changed? 
+                        // If user drastically changes purchaseDate, maybe it's a correction. 
+                        // But if they just change shares, likely a new buy/sell. 
+                        // Let's assume today for now unless we added a specific "New Transaction" feature.
+
+                        shares: Math.abs(shareDiff),
+                        price: pricePerShare,
+                        amount: txnAmount,
+                        currency: 'EUR',
+                        assetName: updatedInvestment.name,
+                        isin: updatedInvestment.isin
+                    });
+
+                    if (newTxn) {
+                        setTransactions(prev => [newTxn, ...prev]);
+                    }
+                }
+
             } catch (error) {
                 console.error('Failed to update investment in Supabase:', error);
             }
@@ -297,16 +365,34 @@ export function InvestmentProvider({ children }: { children: React.ReactNode }) 
         }
     }, [investments, user, updateHistory]);
 
+    const deleteTransaction = useCallback(async (id: string) => {
+        // Optimistic update
+        setTransactions(prev => prev.filter(t => t.id !== id));
+
+        if (user) {
+            try {
+                await deleteSupabaseTransaction(id);
+            } catch (error) {
+                console.error('Failed to delete transaction from Supabase:', error);
+                // Revert or refresh on error? For now just log.
+                const refreshed = await fetchUserTransactions(user.id);
+                setTransactions(refreshed);
+            }
+        }
+    }, [user]);
+
     const portfolioSummary = calculatePortfolioSummary(investments, history);
 
     const value: InvestmentContextType = {
         investments,
+        transactions,
         history,
         portfolioSummary,
         loading,
         addInvestment,
         editInvestment,
         deleteInvestment,
+        deleteTransaction,
         refreshPrices,
     };
 

@@ -12,6 +12,21 @@ export interface Investment {
     lastUpdated?: Date;
     historicalData?: { date: string; value: number }[];
     targetWeight?: number; // Target weight in percentage (0-100)
+    assetClass?: 'Equity' | 'Fixed Income' | 'Real Estate' | 'Commodity' | 'Cash' | 'Crypto';
+    region?: 'Global' | 'North America' | 'Europe' | 'Emerging Markets' | 'Asia Pacific' | 'Japan';
+}
+
+export interface Transaction {
+    id: string;
+    investmentId?: string;
+    type: 'BUY' | 'SELL' | 'DIVIDEND' | 'DEPOSIT' | 'WITHDRAWAL';
+    date: string;
+    shares: number;
+    price: number;
+    amount: number;
+    currency: string;
+    assetName?: string;
+    isin?: string;
 }
 
 export interface HistoryEntry {

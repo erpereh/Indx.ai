@@ -4,8 +4,8 @@ import type { Investment } from '@/lib/types';
 // ============================================
 // Supabase <-> TypeScript field mapping
 // ============================================
-// DB: id, user_id, isin, name, shares, total_investment, purchase_date, target_weight, created_at, updated_at
-// TS: id, name, isin, shares, initialInvestment, purchaseDate, targetWeight + runtime fields (currentPrice, etc.)
+// DB: id, user_id, isin, name, shares, total_investment, purchase_date, target_weight, asset_class, region, created_at, updated_at
+// TS: id, name, isin, shares, initialInvestment, purchaseDate, targetWeight, assetClass, region
 
 interface SupabaseInvestmentRow {
     id: string;
@@ -16,6 +16,8 @@ interface SupabaseInvestmentRow {
     total_investment: number;
     purchase_date: string;
     target_weight: number | null;
+    asset_class: string | null;
+    region: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -33,6 +35,8 @@ function rowToInvestment(row: SupabaseInvestmentRow): Investment {
         initialInvestment: Number(row.total_investment),
         purchaseDate: row.purchase_date,
         targetWeight: row.target_weight != null ? Number(row.target_weight) : undefined,
+        assetClass: (row.asset_class as any) || undefined,
+        region: (row.region as any) || undefined,
     };
 }
 
@@ -49,6 +53,8 @@ function investmentToRow(userId: string, inv: Investment): Omit<SupabaseInvestme
         total_investment: inv.initialInvestment,
         purchase_date: inv.purchaseDate,
         target_weight: inv.targetWeight ?? null,
+        asset_class: inv.assetClass || null,
+        region: inv.region || null,
     };
 }
 
@@ -152,4 +158,102 @@ export async function bulkInsertInvestments(userId: string, investments: Investm
     }
 
     return (data || []).map((row: SupabaseInvestmentRow) => rowToInvestment(row));
+}
+
+// ============================================
+// Transactions Support
+// ============================================
+
+interface SupabaseTransactionRow {
+    id: string;
+    user_id: string;
+    investment_id: string | null;
+    type: string;
+    date: string;
+    shares: number;
+    price: number;
+    amount: number;
+    currency: string;
+    asset_name: string | null;
+    isin: string | null;
+    created_at: string;
+}
+
+import type { Transaction } from '@/lib/types';
+
+function rowToTransaction(row: SupabaseTransactionRow): Transaction {
+    return {
+        id: row.id,
+        investmentId: row.investment_id || undefined,
+        type: row.type as any,
+        date: row.date,
+        shares: Number(row.shares),
+        price: Number(row.price),
+        amount: Number(row.amount),
+        currency: row.currency,
+        assetName: row.asset_name || undefined,
+        isin: row.isin || undefined,
+    };
+}
+
+export async function fetchUserTransactions(userId: string): Promise<Transaction[]> {
+    const supabase = createClient();
+
+    const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching transactions:', error);
+        return [];
+    }
+
+    return (data || []).map((row: SupabaseTransactionRow) => rowToTransaction(row));
+}
+
+export async function addTransaction(userId: string, txn: Omit<Transaction, 'id'>): Promise<Transaction | null> {
+    const supabase = createClient();
+
+    // Convert undefined to null for Supabase
+    const row = {
+        user_id: userId,
+        investment_id: txn.investmentId || null,
+        type: txn.type,
+        date: txn.date,
+        shares: txn.shares,
+        price: txn.price,
+        amount: txn.amount,
+        currency: txn.currency || 'EUR',
+        asset_name: txn.assetName || null,
+        isin: txn.isin ? txn.isin.trim().toUpperCase() : null,
+    };
+
+    const { data, error } = await supabase
+        .from('transactions')
+        .insert(row)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error adding transaction:', error);
+        return null;
+    }
+
+    return rowToTransaction(data as SupabaseTransactionRow);
+}
+
+export async function deleteSupabaseTransaction(transactionId: string): Promise<void> {
+    const supabase = createClient();
+
+    const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', transactionId);
+
+    if (error) {
+        console.error('Error deleting transaction from Supabase:', error);
+        throw error;
+    }
 }

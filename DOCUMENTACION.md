@@ -192,9 +192,11 @@ Extrae datos profundos de fondos no disponibles en APIs públicas gratuitas:
 | `created_at` | timestamptz | Fecha de creación |
 
 ### Migraciones
-Para habilitar todas las funcionalidades, ejecutar en SQL Editor:
+Para habilitar todas las funcionalidades, ejecutar en SQL Editor el archivo `supabase_schema.sql`. Si ya tienes tablas creadas, puedes añadir las columnas necesarias manualmente:
 ```sql
 ALTER TABLE investments ADD COLUMN IF NOT EXISTS target_weight NUMERIC DEFAULT NULL;
+ALTER TABLE investments ADD COLUMN IF NOT EXISTS asset_class TEXT DEFAULT NULL;
+ALTER TABLE investments ADD COLUMN IF NOT EXISTS region TEXT DEFAULT NULL;
 ```
 
 ---

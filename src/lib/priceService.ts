@@ -65,3 +65,18 @@ export async function fetchFundHistory(isin: string): Promise<{ date: string; va
         return [];
     }
 }
+
+/**
+ * Fetch fund composition (Asset Class & Region data)
+ */
+export async function fetchFundComposition(isin: string): Promise<any> {
+    try {
+        const response = await fetch(`/api/fund-details?isin=${encodeURIComponent(isin)}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.composition || null;
+    } catch (error) {
+        console.error(`Error fetching composition for ISIN ${isin}:`, error);
+        return null;
+    }
+}

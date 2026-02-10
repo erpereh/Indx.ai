@@ -13,6 +13,7 @@ import AddInvestmentModal from '@/components/AddInvestmentModal';
 import FundDetailsSection from '@/components/FundDetailsSection';
 import RebalanceCalculator from '@/components/RebalanceCalculator';
 import ProjectionSimulator from '@/components/ProjectionSimulator';
+import TransactionHistory from '@/components/TransactionHistory';
 import AuthView from '@/components/AuthView';
 import { useInvestments } from '@/context/InvestmentContext';
 import { useAuth } from '@/context/AuthContext';
@@ -21,7 +22,7 @@ import { Investment } from '@/lib/types';
 export default function Home() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'investments' | 'rebalance' | 'fund-details'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'investments' | 'rebalance' | 'fund-details' | 'transactions'>('dashboard');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { refreshPrices, loading } = useInvestments();
     const { user, loading: authLoading } = useAuth();
@@ -51,6 +52,15 @@ export default function Home() {
             return {
                 title: 'Calculadora de Rebalanceo',
                 subtitle: 'Optimización de activos según tus objetivos'
+            };
+            return {
+                title: 'Calculadora de Rebalanceo',
+                subtitle: 'Optimización de activos según tus objetivos'
+            };
+        } else if (activeTab === 'transactions') {
+            return {
+                title: 'Historial de Transacciones',
+                subtitle: 'Registro detallado de operaciones'
             };
         } else {
             return {
@@ -157,6 +167,10 @@ export default function Home() {
                         ) : activeTab === 'rebalance' ? (
                             <section className="animate-fade-in">
                                 <RebalanceCalculator />
+                            </section>
+                        ) : activeTab === 'transactions' ? (
+                            <section className="animate-fade-in">
+                                <TransactionHistory />
                             </section>
                         ) : (
                             <section className="animate-fade-in">

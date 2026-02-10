@@ -103,12 +103,6 @@ export default function AuthView() {
                                     },
                                 },
                             },
-                            className: {
-                                container: 'auth-container',
-                                button: 'auth-button',
-                                input: 'auth-input',
-                                message: 'auth-message',
-                            },
                         }}
                         localization={{
                             variables: {
@@ -129,7 +123,7 @@ export default function AuthView() {
                                     button_label: 'Crear Cuenta',
                                     loading_button_label: 'Creando cuenta...',
                                     link_text: '¿No tienes cuenta? Regístrate',
-                                    confirmation_text: 'Revisa tu correo para confirmar tu cuenta',
+                                    confirmation_text: 'Revisa tu correo para confirmar tu cuenta. Si no llega, revisa la carpeta de Spam.',
                                 },
                                 forgotten_password: {
                                     email_label: 'Correo electrónico',
